@@ -13,7 +13,9 @@ import (
 type ListProjectsArgs struct {
 	Offset   int    `json:"offset,omitempty"`
 	PageSize int    `json:"pageSize,omitempty"`
+	SortBy   string `json:"sortBy,omitempty"`
 	OrderBy  string `json:"orderBy,omitempty"`
+	Filters  string `json:"filters,omitempty"`
 }
 
 // GetProjectArgs represents arguments for the get_project tool.
@@ -45,30 +47,45 @@ type DeleteProjectArgs struct {
 
 // registerProjectTools registers project-related tools.
 func (r *Registry) registerProjectTools(server *mcp.Server) {
-	server.AddTool(&mcp.Tool{
-		Name:        "list_projects",
-		Description: "List all projects in OpenProject",
-	}, r.listProjects)
+	addTool(server, "list_projects", "List all projects in OpenProject",
+		newSchema(schemaProps{
+			"offset":   schemaInt("Pagination offset (default: 0)"),
+			"pageSize": schemaInt("Number of items per page (default: 20)"),
+			"sortBy":   schemaStr(`Sort criteria, e.g. "name:asc"`),
+			"filters":  schemaStr("Raw JSON filter string, e.g. [{\"active\":{\"operator\":\"=\",\"values\":[\"t\"]}}]"),
+		}),
+		r.listProjects)
 
-	server.AddTool(&mcp.Tool{
-		Name:        "get_project",
-		Description: "Get details of a specific project by ID",
-	}, r.getProject)
+	addTool(server, "get_project", "Get details of a specific project by ID",
+		newSchema(schemaProps{
+			"id": schemaInt("Project ID"),
+		}, "id"),
+		r.getProject)
 
-	server.AddTool(&mcp.Tool{
-		Name:        "create_project",
-		Description: "Create a new project in OpenProject",
-	}, r.createProject)
+	addTool(server, "create_project", "Create a new project in OpenProject",
+		newSchema(schemaProps{
+			"name":        schemaStr("Project name"),
+			"identifier":  schemaStr("Unique project identifier (slug)"),
+			"description": schemaStr("Project description"),
+			"public":      schemaBool("Whether the project is publicly visible"),
+		}, "name", "identifier"),
+		r.createProject)
 
-	server.AddTool(&mcp.Tool{
-		Name:        "update_project",
-		Description: "Update an existing project",
-	}, r.updateProject)
+	addTool(server, "update_project", "Update an existing project",
+		newSchema(schemaProps{
+			"id":          schemaInt("Project ID"),
+			"name":        schemaStr("New project name"),
+			"description": schemaStr("New project description"),
+			"public":      schemaBool("Whether the project is publicly visible"),
+			"active":      schemaBool("Whether the project is active"),
+		}, "id"),
+		r.updateProject)
 
-	server.AddTool(&mcp.Tool{
-		Name:        "delete_project",
-		Description: "Delete a project from OpenProject",
-	}, r.deleteProject)
+	addTool(server, "delete_project", "Delete a project from OpenProject",
+		newSchema(schemaProps{
+			"id": schemaInt("Project ID"),
+		}, "id"),
+		r.deleteProject)
 }
 
 // parseArgs parses arguments from the request.
@@ -88,9 +105,10 @@ func (r *Registry) listProjects(ctx context.Context, req *mcp.CallToolRequest) (
 	}
 
 	opts := &openproject.ListProjectsOptions{
-		Offset:   args.Offset,
-		PageSize: args.PageSize,
-		OrderBy:  args.OrderBy,
+		Offset:     args.Offset,
+		PageSize:   args.PageSize,
+		SortBy:     firstNonEmpty(args.SortBy, args.OrderBy),
+		RawFilters: args.Filters,
 	}
 
 	projects, err := r.client.ListProjects(ctx, opts)
@@ -102,8 +120,8 @@ func (r *Registry) listProjects(ctx context.Context, req *mcp.CallToolRequest) (
 	for _, p := range projects.Embedded.Elements {
 		result += fmt.Sprintf("- **%s** (ID: %d)\n", p.Name, p.ID)
 		result += fmt.Sprintf("  Identifier: %s\n", p.Identifier)
-		if p.Description != "" {
-			result += fmt.Sprintf("  Description: %s\n", p.Description)
+		if p.Description.Raw != "" {
+			result += fmt.Sprintf("  Description: %s\n", p.Description.Raw)
 		}
 		result += "\n"
 	}
@@ -128,8 +146,8 @@ func (r *Registry) getProject(ctx context.Context, req *mcp.CallToolRequest) (*m
 	result += fmt.Sprintf("- **Identifier:** %s\n", project.Identifier)
 	result += fmt.Sprintf("- **Active:** %v\n", project.Active)
 	result += fmt.Sprintf("- **Public:** %v\n", project.Public)
-	if project.Description != "" {
-		result += fmt.Sprintf("\n## Description\n%s\n", project.Description)
+	if project.Description.Raw != "" {
+		result += fmt.Sprintf("\n## Description\n%s\n", project.Description.Raw)
 	}
 
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil

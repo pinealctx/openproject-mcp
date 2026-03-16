@@ -13,7 +13,8 @@ import (
 type ListMembershipsOptions struct {
 	Offset   int
 	PageSize int
-	OrderBy  string
+	SortBy   string
+	OrderBy  string // Deprecated: use SortBy
 	Select   []string
 	Filters  []MembershipFilter
 }
@@ -38,8 +39,10 @@ func (c *Client) ListMemberships(ctx context.Context, opts *ListMembershipsOptio
 	if opts.PageSize > 0 {
 		params.Set("pageSize", strconv.Itoa(opts.PageSize))
 	}
-	if opts.OrderBy != "" {
-		params.Set("orderBy", opts.OrderBy)
+	if opts.SortBy != "" {
+		params.Set("sortBy", opts.SortBy)
+	} else if opts.OrderBy != "" {
+		params.Set("sortBy", opts.OrderBy)
 	}
 	if len(opts.Select) > 0 {
 		params.Set("select", strings.Join(opts.Select, ","))
@@ -169,7 +172,24 @@ func (c *Client) GetRole(ctx context.Context, id int) (*Role, error) {
 
 // jsonMarshalMembershipFilters marshals membership filters to JSON string.
 func jsonMarshalMembershipFilters(filters []MembershipFilter) (string, error) {
-	data, err := json.Marshal(filters)
+	encoded := make([]map[string]map[string]interface{}, 0, len(filters))
+	for _, f := range filters {
+		if f.Name == "" {
+			continue
+		}
+		op := f.Operator
+		if op == "" {
+			op = "="
+		}
+		encoded = append(encoded, map[string]map[string]interface{}{
+			f.Name: {
+				"operator": op,
+				"values":   f.Values,
+			},
+		})
+	}
+
+	data, err := json.Marshal(encoded)
 	if err != nil {
 		return "", err
 	}

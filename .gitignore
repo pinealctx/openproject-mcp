@@ -1,0 +1,39 @@
+﻿# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+openproject-mcp
+
+# Build output
+/build/
+
+# Test binary
+*.test
+
+# Go coverage
+*.out
+coverage.html
+
+# Dependency directories
+/vendor/
+
+# Environment / secrets
+.env
+.env.*
+*.local.*
+
+# IDE
+.vscode/mcp.json
+.vscode/settings.json
+.idea/
+
+# MCP config with credentials
+.mcp.json
+
+# Temp / scratch
+/tmp/
+
+# macOS
+.DS_Store

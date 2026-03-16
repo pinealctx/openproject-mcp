@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Build binaries
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          LDFLAGS: -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }}"
+        run: |
+          mkdir -p dist
+
+          CGO_ENABLED=0 GOOS=linux   GOARCH=amd64 go build $LDFLAGS -o dist/openproject-mcp-linux-amd64        .
+          CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build $LDFLAGS -o dist/openproject-mcp-linux-arm64        .
+          CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64 go build $LDFLAGS -o dist/openproject-mcp-darwin-amd64       .
+          CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64 go build $LDFLAGS -o dist/openproject-mcp-darwin-arm64       .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build $LDFLAGS -o dist/openproject-mcp-windows-amd64.exe  .
+
+      - name: Compress binaries
+        run: |
+          cd dist
+          for f in openproject-mcp-linux-* openproject-mcp-darwin-*; do
+            tar czf "${f}.tar.gz" "$f"
+            rm "$f"
+          done
+          zip openproject-mcp-windows-amd64.zip openproject-mcp-windows-amd64.exe
+          rm openproject-mcp-windows-amd64.exe
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

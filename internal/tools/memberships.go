@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
@@ -31,14 +32,47 @@ type GetRoleArgs struct{ ID int }
 
 // registerMembershipTools registers membership-related tools.
 func (r *Registry) registerMembershipTools(server *mcp.Server) {
-	server.AddTool(&mcp.Tool{Name: "list_memberships", Description: "List all memberships"}, r.listMemberships)
-	server.AddTool(&mcp.Tool{Name: "get_membership", Description: "Get details of a specific membership"}, r.getMembership)
-	server.AddTool(&mcp.Tool{Name: "create_membership", Description: "Add a user to a project with specified roles"}, r.createMembership)
-	server.AddTool(&mcp.Tool{Name: "update_membership", Description: "Update roles for a membership"}, r.updateMembership)
-	server.AddTool(&mcp.Tool{Name: "delete_membership", Description: "Remove a user from a project"}, r.deleteMembership)
-	server.AddTool(&mcp.Tool{Name: "list_project_members", Description: "List all members of a project"}, r.listProjectMembers)
-	server.AddTool(&mcp.Tool{Name: "list_roles", Description: "List all available roles"}, r.listRoles)
-	server.AddTool(&mcp.Tool{Name: "get_role", Description: "Get details of a specific role"}, r.getRole)
+	addTool(server, "list_memberships", "List all memberships, optionally filtered by project",
+		newSchema(schemaProps{
+			"projectId": schemaInt("Filter by project ID"),
+			"offset":    schemaInt("Pagination offset"),
+			"pageSize":  schemaInt("Items per page"),
+		}),
+		r.listMemberships)
+
+	addTool(server, "get_membership", "Get details of a specific membership",
+		newSchema(schemaProps{"id": schemaInt("Membership ID")}, "id"),
+		r.getMembership)
+
+	addTool(server, "create_membership", "Add a user to a project with specified roles",
+		newSchema(schemaProps{
+			"projectId": schemaInt("Project ID"),
+			"principal": schemaInt("User ID to add"),
+			"roleIds":   {Type: "array", Description: "List of role IDs to assign", Items: schemaInt("Role ID")},
+		}, "projectId", "principal", "roleIds"),
+		r.createMembership)
+
+	addTool(server, "update_membership", "Update roles for a membership",
+		newSchema(schemaProps{
+			"id":      schemaInt("Membership ID"),
+			"roleIds": {Type: "array", Description: "New list of role IDs", Items: schemaInt("Role ID")},
+		}, "id", "roleIds"),
+		r.updateMembership)
+
+	addTool(server, "delete_membership", "Remove a user from a project",
+		newSchema(schemaProps{"id": schemaInt("Membership ID")}, "id"),
+		r.deleteMembership)
+
+	addTool(server, "list_project_members", "List all members of a project",
+		newSchema(schemaProps{"projectId": schemaInt("Project ID")}, "projectId"),
+		r.listProjectMembers)
+
+	addTool(server, "list_roles", "List all available roles",
+		noSchema, r.listRoles)
+
+	addTool(server, "get_role", "Get details of a specific role",
+		newSchema(schemaProps{"id": schemaInt("Role ID")}, "id"),
+		r.getRole)
 }
 
 func (r *Registry) listMemberships(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -59,7 +93,23 @@ func (r *Registry) listMemberships(ctx context.Context, req *mcp.CallToolRequest
 
 	result := fmt.Sprintf("Found %d memberships:\n\n", list.Total)
 	for _, m := range list.Embedded.Elements {
-		result += fmt.Sprintf("- Membership #%d\n", m.ID)
+		principal := "Unknown"
+		if m.Links != nil && m.Links.Principal != nil {
+			principal = m.Links.Principal.Title
+		}
+		roles := []string{}
+		if m.Links != nil {
+			for _, r := range m.Links.Roles {
+				if r != nil {
+					roles = append(roles, r.Title)
+				}
+			}
+		}
+		rolesStr := strings.Join(roles, ", ")
+		if rolesStr == "" {
+			rolesStr = "No roles"
+		}
+		result += fmt.Sprintf("- #%d **%s** — Roles: %s\n", m.ID, principal, rolesStr)
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
 }
@@ -74,7 +124,30 @@ func (r *Registry) getMembership(ctx context.Context, req *mcp.CallToolRequest) 
 	if err != nil {
 		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to get membership: %v", err)}}}, nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Membership #%d", m.ID)}}}, nil
+
+	principal, project := "Unknown", "Unknown"
+	if m.Links != nil {
+		if m.Links.Principal != nil {
+			principal = m.Links.Principal.Title
+		}
+		if m.Links.Project != nil {
+			project = m.Links.Project.Title
+		}
+	}
+	roles := []string{}
+	if m.Links != nil {
+		for _, role := range m.Links.Roles {
+			if role != nil {
+				roles = append(roles, role.Title)
+			}
+		}
+	}
+
+	result := fmt.Sprintf("# Membership #%d\n\n", m.ID)
+	result += fmt.Sprintf("- **Principal:** %s\n", principal)
+	result += fmt.Sprintf("- **Project:** %s\n", project)
+	result += fmt.Sprintf("- **Roles:** %s\n", strings.Join(roles, ", "))
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
 }
 
 func (r *Registry) createMembership(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -131,7 +204,13 @@ func (r *Registry) listProjectMembers(ctx context.Context, req *mcp.CallToolRequ
 	result := fmt.Sprintf("Found %d members:\n\n", list.Total)
 	for _, m := range list.Embedded.Elements {
 		if m.Links != nil && m.Links.Principal != nil {
-			result += fmt.Sprintf("- %s\n", m.Links.Principal.Title)
+			roles := []string{}
+			for _, role := range m.Links.Roles {
+				if role != nil {
+					roles = append(roles, role.Title)
+				}
+			}
+			result += fmt.Sprintf("- **%s** — %s\n", m.Links.Principal.Title, strings.Join(roles, ", "))
 		}
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil

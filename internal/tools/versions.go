@@ -19,8 +19,21 @@ type CreateVersionArgs struct {
 
 // registerVersionTools registers version-related tools.
 func (r *Registry) registerVersionTools(server *mcp.Server) {
-	server.AddTool(&mcp.Tool{Name: "list_versions", Description: "List all versions for a project"}, r.listVersions)
-	server.AddTool(&mcp.Tool{Name: "create_version", Description: "Create a new version/milestone in a project"}, r.createVersion)
+	addTool(server, "list_versions", "List all versions for a project",
+		newSchema(schemaProps{
+			"projectId": schemaInt("Project ID"),
+		}, "projectId"),
+		r.listVersions)
+
+	addTool(server, "create_version", "Create a new version/milestone in a project",
+		newSchema(schemaProps{
+			"projectId":   schemaInt("Project ID"),
+			"name":        schemaStr("Version name"),
+			"description": schemaStr("Version description"),
+			"startDate":   schemaStr("Start date (YYYY-MM-DD)"),
+			"endDate":     schemaStr("End date / due date (YYYY-MM-DD)"),
+		}, "projectId", "name"),
+		r.createVersion)
 }
 
 func (r *Registry) listVersions(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -36,7 +49,7 @@ func (r *Registry) listVersions(ctx context.Context, req *mcp.CallToolRequest) (
 
 	result := fmt.Sprintf("Found %d versions:\n\n", list.Total)
 	for _, v := range list.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d) - %s\n", v.Name, v.ID, v.Status)
+		result += fmt.Sprintf("- **%s** (ID: %d) — %s\n", v.Name, v.ID, v.Status)
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
 }

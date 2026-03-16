@@ -11,11 +11,13 @@ import (
 
 // ListWorkPackagesOptions contains options for listing work packages.
 type ListWorkPackagesOptions struct {
-	Offset   int
-	PageSize int
-	OrderBy  string
-	Select   []string
-	Filters  []WorkPackageFilter
+	Offset     int
+	PageSize   int
+	SortBy     string
+	OrderBy    string // Deprecated: use SortBy
+	Select     []string
+	Filters    []WorkPackageFilter
+	RawFilters string // overrides Filters when non-empty
 }
 
 // WorkPackageFilter represents a filter for work packages.
@@ -38,13 +40,17 @@ func (c *Client) ListWorkPackages(ctx context.Context, opts *ListWorkPackagesOpt
 	if opts.PageSize > 0 {
 		params.Set("pageSize", strconv.Itoa(opts.PageSize))
 	}
-	if opts.OrderBy != "" {
-		params.Set("orderBy", opts.OrderBy)
+	if opts.SortBy != "" {
+		params.Set("sortBy", opts.SortBy)
+	} else if opts.OrderBy != "" {
+		params.Set("sortBy", opts.OrderBy)
 	}
 	if len(opts.Select) > 0 {
 		params.Set("select", strings.Join(opts.Select, ","))
 	}
-	if len(opts.Filters) > 0 {
+	if opts.RawFilters != "" {
+		params.Set("filters", opts.RawFilters)
+	} else if len(opts.Filters) > 0 {
 		filterJSON, err := jsonMarshalFilters(opts.Filters)
 		if err != nil {
 			return nil, err
@@ -77,13 +83,17 @@ func (c *Client) ListProjectWorkPackages(ctx context.Context, projectID int, opt
 	if opts.PageSize > 0 {
 		params.Set("pageSize", strconv.Itoa(opts.PageSize))
 	}
-	if opts.OrderBy != "" {
-		params.Set("orderBy", opts.OrderBy)
+	if opts.SortBy != "" {
+		params.Set("sortBy", opts.SortBy)
+	} else if opts.OrderBy != "" {
+		params.Set("sortBy", opts.OrderBy)
 	}
 	if len(opts.Select) > 0 {
 		params.Set("select", strings.Join(opts.Select, ","))
 	}
-	if len(opts.Filters) > 0 {
+	if opts.RawFilters != "" {
+		params.Set("filters", opts.RawFilters)
+	} else if len(opts.Filters) > 0 {
 		filterJSON, err := jsonMarshalFilters(opts.Filters)
 		if err != nil {
 			return nil, err
@@ -114,17 +124,18 @@ func (c *Client) GetWorkPackage(ctx context.Context, id int) (*WorkPackage, erro
 
 // CreateWorkPackageOptions contains options for creating a work package.
 type CreateWorkPackageOptions struct {
-	Subject     string                  `json:"subject"`
-	Description string                  `json:"description,omitempty"`
-	Type        string                  `json:"_type,omitempty"`
-	StartDate   string                  `json:"startDate,omitempty"`
-	DueDate     string                  `json:"dueDate,omitempty"`
-	Assignee    *WorkPackageLink        `json:"assignee,omitempty"`
-	Project     *WorkPackageLink        `json:"project,omitempty"`
-	Status      *WorkPackageLink        `json:"status,omitempty"`
-	Priority    *WorkPackageLink        `json:"priority,omitempty"`
-	Version     *WorkPackageLink        `json:"version,omitempty"`
-	Links       *CreateWorkPackageLinks `json:"_links,omitempty"`
+	Subject       string                  `json:"subject"`
+	Description   *RichText               `json:"description,omitempty"`
+	Type          string                  `json:"_type,omitempty"`
+	StartDate     string                  `json:"startDate,omitempty"`
+	DueDate       string                  `json:"dueDate,omitempty"`
+	EstimatedTime string                  `json:"estimatedTime,omitempty"`
+	Assignee      *WorkPackageLink        `json:"assignee,omitempty"`
+	Project       *WorkPackageLink        `json:"project,omitempty"`
+	Status        *WorkPackageLink        `json:"status,omitempty"`
+	Priority      *WorkPackageLink        `json:"priority,omitempty"`
+	Version       *WorkPackageLink        `json:"version,omitempty"`
+	Links         *CreateWorkPackageLinks `json:"_links,omitempty"`
 }
 
 // CreateWorkPackageLinks contains links for creating a work package.
@@ -164,12 +175,14 @@ func (c *Client) CreateWorkPackage(ctx context.Context, projectID int, opts *Cre
 
 // UpdateWorkPackageOptions contains options for updating a work package.
 type UpdateWorkPackageOptions struct {
-	Subject     string                  `json:"subject,omitempty"`
-	Description string                  `json:"description,omitempty"`
-	StartDate   string                  `json:"startDate,omitempty"`
-	DueDate     string                  `json:"dueDate,omitempty"`
-	LockVersion int                     `json:"lockVersion,omitempty"`
-	Links       *UpdateWorkPackageLinks `json:"_links,omitempty"`
+	Subject        string                  `json:"subject,omitempty"`
+	Description    *RichText               `json:"description,omitempty"`
+	StartDate      string                  `json:"startDate,omitempty"`
+	DueDate        string                  `json:"dueDate,omitempty"`
+	EstimatedTime  string                  `json:"estimatedTime,omitempty"`
+	PercentageDone *int                    `json:"percentageDone,omitempty"`
+	LockVersion    int                     `json:"lockVersion"` // always sent; 0 is valid
+	Links          *UpdateWorkPackageLinks `json:"_links,omitempty"`
 }
 
 // UpdateWorkPackageLinks contains links for updating a work package.
@@ -181,8 +194,15 @@ type UpdateWorkPackageLinks struct {
 	Parent   *WorkPackageLink `json:"parent,omitempty"`
 }
 
-// UpdateWorkPackage updates an existing work package.
+// UpdateWorkPackage updates an existing work package. It automatically fetches
+// the current lockVersion to satisfy OpenProject's optimistic concurrency check.
 func (c *Client) UpdateWorkPackage(ctx context.Context, id int, opts *UpdateWorkPackageOptions) (*WorkPackage, error) {
+	current, err := c.GetWorkPackage(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch current work package for lockVersion: %w", err)
+	}
+	opts.LockVersion = current.LockVersion
+
 	var wp WorkPackage
 	if err := c.Patch(ctx, fmt.Sprintf("/work_packages/%d", id), opts, &wp); err != nil {
 		return nil, err
@@ -233,7 +253,24 @@ func (c *Client) ListPriorities(ctx context.Context) (*PriorityList, error) {
 
 // jsonMarshalFilters marshals filters to JSON string.
 func jsonMarshalFilters(filters []WorkPackageFilter) (string, error) {
-	data, err := json.Marshal(filters)
+	encoded := make([]map[string]map[string]interface{}, 0, len(filters))
+	for _, f := range filters {
+		if f.Name == "" {
+			continue
+		}
+		op := f.Operator
+		if op == "" {
+			op = "="
+		}
+		encoded = append(encoded, map[string]map[string]interface{}{
+			f.Name: {
+				"operator": op,
+				"values":   f.Values,
+			},
+		})
+	}
+
+	data, err := json.Marshal(encoded)
 	if err != nil {
 		return "", err
 	}

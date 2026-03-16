@@ -33,14 +33,51 @@ type DeleteWorkPackageRelationArgs struct{ ID int }
 
 // registerRelationTools registers relation-related tools.
 func (r *Registry) registerRelationTools(server *mcp.Server) {
-	server.AddTool(&mcp.Tool{Name: "set_work_package_parent", Description: "Set the parent of a work package"}, r.setWorkPackageParent)
-	server.AddTool(&mcp.Tool{Name: "remove_work_package_parent", Description: "Remove the parent relationship from a work package"}, r.removeWorkPackageParent)
-	server.AddTool(&mcp.Tool{Name: "list_work_package_children", Description: "List all child work packages of a parent"}, r.listWorkPackageChildren)
-	server.AddTool(&mcp.Tool{Name: "create_work_package_relation", Description: "Create a relation between two work packages"}, r.createWorkPackageRelation)
-	server.AddTool(&mcp.Tool{Name: "list_work_package_relations", Description: "List all relations for a work package"}, r.listWorkPackageRelations)
-	server.AddTool(&mcp.Tool{Name: "get_work_package_relation", Description: "Get details of a specific relation"}, r.getWorkPackageRelation)
-	server.AddTool(&mcp.Tool{Name: "update_work_package_relation", Description: "Update an existing relation"}, r.updateWorkPackageRelation)
-	server.AddTool(&mcp.Tool{Name: "delete_work_package_relation", Description: "Delete a relation between work packages"}, r.deleteWorkPackageRelation)
+	addTool(server, "set_work_package_parent", "Set the parent of a work package",
+		newSchema(schemaProps{
+			"workPackageId": schemaInt("Child work package ID"),
+			"parentId":      schemaInt("Parent work package ID"),
+		}, "workPackageId", "parentId"),
+		r.setWorkPackageParent)
+
+	addTool(server, "remove_work_package_parent", "Remove the parent relationship from a work package",
+		newSchema(schemaProps{"workPackageId": schemaInt("Work package ID")}, "workPackageId"),
+		r.removeWorkPackageParent)
+
+	addTool(server, "list_work_package_children", "List all child work packages of a parent",
+		newSchema(schemaProps{"workPackageId": schemaInt("Parent work package ID")}, "workPackageId"),
+		r.listWorkPackageChildren)
+
+	addTool(server, "create_work_package_relation", "Create a relation between two work packages",
+		newSchema(schemaProps{
+			"fromId":      schemaInt("Source work package ID"),
+			"toId":        schemaInt("Target work package ID"),
+			"type":        schemaEnum("Relation type", "follows", "precedes", "blocks", "blocked_by", "includes", "part_of", "duplicates", "duplicated"),
+			"description": schemaStr("Optional description"),
+			"delay":       schemaInt("Delay in days (for follows/precedes)"),
+		}, "fromId", "toId", "type"),
+		r.createWorkPackageRelation)
+
+	addTool(server, "list_work_package_relations", "List all relations for a work package",
+		newSchema(schemaProps{"workPackageId": schemaInt("Work package ID")}, "workPackageId"),
+		r.listWorkPackageRelations)
+
+	addTool(server, "get_work_package_relation", "Get details of a specific relation",
+		newSchema(schemaProps{"id": schemaInt("Relation ID")}, "id"),
+		r.getWorkPackageRelation)
+
+	addTool(server, "update_work_package_relation", "Update an existing relation",
+		newSchema(schemaProps{
+			"id":          schemaInt("Relation ID"),
+			"type":        schemaEnum("New relation type", "follows", "precedes", "blocks", "blocked_by", "includes", "part_of", "duplicates", "duplicated"),
+			"description": schemaStr("New description"),
+			"delay":       schemaInt("New delay in days"),
+		}, "id"),
+		r.updateWorkPackageRelation)
+
+	addTool(server, "delete_work_package_relation", "Delete a relation between work packages",
+		newSchema(schemaProps{"id": schemaInt("Relation ID")}, "id"),
+		r.deleteWorkPackageRelation)
 }
 
 func (r *Registry) setWorkPackageParent(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -98,7 +135,7 @@ func (r *Registry) createWorkPackageRelation(ctx context.Context, req *mcp.CallT
 	if err != nil {
 		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to create relation: %v", err)}}}, nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Relation #%d created: %s (#%d -> #%d)", rel.ID, args.Type, args.FromID, args.ToID)}}}, nil
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Relation #%d created: %s (#%d → #%d)", rel.ID, args.Type, args.FromID, args.ToID)}}}, nil
 }
 
 func (r *Registry) listWorkPackageRelations(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {

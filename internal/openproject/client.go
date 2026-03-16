@@ -53,6 +53,25 @@ func NewClient(cfg *config.Config) *Client {
 	}
 }
 
+// NewClientDirect creates a client directly from credentials without a Config struct.
+// Used by the HTTP/SSE server to create per-request clients from headers.
+func NewClientDirect(baseURL, apiKey string, timeout time.Duration) *Client {
+	transport := &http.Transport{
+		MaxIdleConns:       10,
+		IdleConnTimeout:    30 * time.Second,
+		DisableCompression: false,
+	}
+	return &Client{
+		baseURL: strings.TrimSuffix(baseURL, "/"),
+		apiKey:  apiKey,
+		httpClient: &http.Client{
+			Transport: transport,
+			Timeout:   timeout,
+		},
+		logger: slog.Default(),
+	}
+}
+
 // SetLogger sets the client logger.
 func (c *Client) SetLogger(logger *slog.Logger) {
 	c.logger = logger
@@ -77,7 +96,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	// Use Basic Auth with apikey as username (OpenProject standard)
+	// Format: Authorization: Basic base64(apikey:<token>)
+	req.SetBasicAuth("apikey", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
@@ -144,4 +165,13 @@ func (c *Client) TestConnection(ctx context.Context) (*User, error) {
 // GetCurrentUser returns the current authenticated user.
 func (c *Client) GetCurrentUser(ctx context.Context) (*User, error) {
 	return c.TestConnection(ctx)
+}
+
+// GetAPIRoot retrieves the API root document (version info, available links).
+func (c *Client) GetAPIRoot(ctx context.Context) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	if err := c.Get(ctx, "", &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

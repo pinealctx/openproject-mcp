@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/config"
@@ -13,25 +15,66 @@ import (
 	"github.com/pinealctx/openproject-mcp/internal/tools"
 )
 
+// clientContextKey is the context key for the per-request OpenProject client.
+type clientContextKey struct{}
+
 // Server represents the MCP server for OpenProject.
 type Server struct {
-	config  *config.Config
-	client  *openproject.Client
-	logger  *slog.Logger
-	version string
+	config      *config.Config
+	client      *openproject.Client // default client; nil when http/sse without pre-configured credentials
+	logger      *slog.Logger
+	version     string
+	clientCache sync.Map // caches openproject.Client instances keyed by "url\x00apiKey"
 }
 
 // New creates a new MCP server.
 func New(cfg *config.Config, version string) (*Server, error) {
-	// Create OpenProject client
-	client := openproject.NewClient(cfg)
-
+	var client *openproject.Client
+	if cfg.IsConfigured() {
+		client = openproject.NewClient(cfg)
+	}
 	return &Server{
 		config:  cfg,
 		client:  client,
 		logger:  slog.Default(),
 		version: version,
 	}, nil
+}
+
+// cachedClient returns a cached Client for the given credentials, creating one if needed.
+func (s *Server) cachedClient(baseURL, apiKey string) *openproject.Client {
+	key := baseURL + "\x00" + apiKey
+	if v, ok := s.clientCache.Load(key); ok {
+		return v.(*openproject.Client)
+	}
+	c := openproject.NewClientDirect(baseURL, apiKey, 30*time.Second)
+	s.clientCache.Store(key, c)
+	return c
+}
+
+// withClientMiddleware is an HTTP middleware that resolves the OpenProject client
+// for each request. Resolution order:
+//  1. X-OpenProject-URL + X-OpenProject-API-Key headers (per-request, multi-tenant)
+//  2. Server-level default client (pre-configured via env vars)
+//  3. Neither available → HTTP 401
+func (s *Server) withClientMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var client *openproject.Client
+		opURL := req.Header.Get("X-OpenProject-URL")
+		apiKey := req.Header.Get("X-OpenProject-API-Key")
+		if opURL != "" && apiKey != "" {
+			client = s.cachedClient(opURL, apiKey)
+		} else if s.client != nil {
+			client = s.client
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":"OpenProject credentials required: provide X-OpenProject-URL and X-OpenProject-API-Key headers"}`))
+			return
+		}
+		ctx := context.WithValue(req.Context(), clientContextKey{}, client)
+		next.ServeHTTP(w, req.WithContext(ctx))
+	})
 }
 
 // Run starts the MCP server with the configured transport.
@@ -48,15 +91,14 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 }
 
-// createMCPServer creates and configures the MCP server with all tools.
-func (s *Server) createMCPServer() *mcp.Server {
+// createMCPServer creates and configures the MCP server with all tools for the given client.
+func (s *Server) createMCPServer(client *openproject.Client) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "openproject-mcp",
 		Version: s.version,
 	}, nil)
 
-	// Register all tools
-	registry := tools.NewRegistry(s.client)
+	registry := tools.NewRegistry(client)
 	registry.RegisterAllTools(server)
 
 	return server
@@ -66,7 +108,8 @@ func (s *Server) createMCPServer() *mcp.Server {
 func (s *Server) runStdio(ctx context.Context) error {
 	s.logger.Info("Starting MCP server with stdio transport")
 
-	server := s.createMCPServer()
+	// For stdio, s.client is guaranteed non-nil (validated at startup).
+	server := s.createMCPServer(s.client)
 
 	// Run with stdio transport
 	transport := &mcp.StdioTransport{}
@@ -83,19 +126,20 @@ func (s *Server) runStdio(ctx context.Context) error {
 }
 
 // runSSE runs the server with SSE transport.
+// Each SSE connection gets its own openproject.Client resolved via withClientMiddleware.
 func (s *Server) runSSE(ctx context.Context) error {
 	addr := fmt.Sprintf(":%d", s.config.Port)
-	s.logger.Info("Starting MCP server with SSE transport", "address", addr)
+	s.logger.Info("Starting MCP server with SSE transport", "address", addr,
+		"default_configured", s.client != nil)
 
-	// Create SSE handler
-	handler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server {
-		return s.createMCPServer()
+	sseHandler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server {
+		client := req.Context().Value(clientContextKey{}).(*openproject.Client)
+		return s.createMCPServer(client)
 	})
 
-	// Start HTTP server
 	httpServer := &http.Server{
 		Addr:    addr,
-		Handler: handler,
+		Handler: s.withClientMiddleware(sseHandler),
 	}
 
 	// Handle shutdown
@@ -109,19 +153,20 @@ func (s *Server) runSSE(ctx context.Context) error {
 }
 
 // runHTTP runs the server with streamable HTTP transport.
+// Each request gets its own openproject.Client resolved via withClientMiddleware.
 func (s *Server) runHTTP(ctx context.Context) error {
 	addr := fmt.Sprintf(":%d", s.config.Port)
-	s.logger.Info("Starting MCP server with HTTP transport", "address", addr)
+	s.logger.Info("Starting MCP server with HTTP transport", "address", addr,
+		"default_configured", s.client != nil)
 
-	// Create streamable HTTP handler
-	handler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
-		return s.createMCPServer()
+	httpHandler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
+		client := req.Context().Value(clientContextKey{}).(*openproject.Client)
+		return s.createMCPServer(client)
 	}, nil)
 
-	// Start HTTP server
 	httpServer := &http.Server{
 		Addr:    addr,
-		Handler: handler,
+		Handler: s.withClientMiddleware(httpHandler),
 	}
 
 	// Handle shutdown
@@ -134,8 +179,11 @@ func (s *Server) runHTTP(ctx context.Context) error {
 	return httpServer.ListenAndServe()
 }
 
-// TestConnection tests the connection to OpenProject.
+// TestConnection tests the connection to OpenProject using the default server client.
 func (s *Server) TestConnection(ctx context.Context) error {
+	if s.client == nil {
+		return fmt.Errorf("no default OpenProject client configured")
+	}
 	_, err := s.client.TestConnection(ctx)
 	return err
 }

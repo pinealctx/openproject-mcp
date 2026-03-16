@@ -45,26 +45,34 @@ func Load() *Config {
 }
 
 // Validate checks if the configuration is valid.
+// For stdio transport, OpenProject credentials are required at startup.
+// For http/sse transport, credentials are optional — clients may supply them
+// per-request via X-OpenProject-URL and X-OpenProject-API-Key headers.
 func (c *Config) Validate() error {
-	if c.OpenProjectURL == "" {
-		return errors.New("OPENPROJECT_URL is required")
-	}
-	if c.APIKey == "" {
-		return errors.New("OPENPROJECT_API_KEY is required")
-	}
-
-	// Validate URL format
-	parsedURL, err := url.Parse(c.OpenProjectURL)
-	if err != nil {
-		return fmt.Errorf("invalid OPENPROJECT_URL: %w", err)
-	}
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return errors.New("OPENPROJECT_URL must start with http:// or https://")
-	}
-
-	// Validate transport
+	// Validate transport first — credential requirements depend on it.
 	if c.Transport != "stdio" && c.Transport != "sse" && c.Transport != "http" {
 		return fmt.Errorf("invalid TRANSPORT: must be 'stdio', 'sse', or 'http', got '%s'", c.Transport)
+	}
+
+	// stdio is single-tenant; credentials must be embedded at startup.
+	if c.Transport == "stdio" {
+		if c.OpenProjectURL == "" {
+			return errors.New("OPENPROJECT_URL is required for stdio transport")
+		}
+		if c.APIKey == "" {
+			return errors.New("OPENPROJECT_API_KEY is required for stdio transport")
+		}
+	}
+
+	// Validate URL format when provided (applies to all transport modes).
+	if c.OpenProjectURL != "" {
+		parsedURL, err := url.Parse(c.OpenProjectURL)
+		if err != nil {
+			return fmt.Errorf("invalid OPENPROJECT_URL: %w", err)
+		}
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			return errors.New("OPENPROJECT_URL must start with http:// or https://")
+		}
 	}
 
 	// Validate proxy URL if provided
@@ -79,6 +87,12 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// IsConfigured reports whether server-level OpenProject credentials are set.
+// When false in http/sse mode, clients must supply credentials via request headers.
+func (c *Config) IsConfigured() bool {
+	return c.OpenProjectURL != "" && c.APIKey != ""
 }
 
 // GetProxyURL returns the proxy URL if configured.

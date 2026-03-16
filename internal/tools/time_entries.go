@@ -9,11 +9,13 @@ import (
 )
 
 type ListTimeEntriesArgs struct {
-	ProjectID     int `json:"projectId,omitempty"`
-	WorkPackageID int `json:"workPackageId,omitempty"`
-	UserID        int `json:"userId,omitempty"`
-	Offset        int `json:"offset,omitempty"`
-	PageSize      int `json:"pageSize,omitempty"`
+	ProjectID     int    `json:"projectId,omitempty"`
+	WorkPackageID int    `json:"workPackageId,omitempty"`
+	UserID        int    `json:"userId,omitempty"`
+	Offset        int    `json:"offset,omitempty"`
+	PageSize      int    `json:"pageSize,omitempty"`
+	SortBy        string `json:"sortBy,omitempty"`
+	OrderBy       string `json:"orderBy,omitempty"`
 }
 
 type CreateTimeEntryArgs struct {
@@ -39,27 +41,64 @@ type ListTimeEntryActivitiesArgs struct{}
 
 // registerTimeEntryTools registers time entry-related tools.
 func (r *Registry) registerTimeEntryTools(server *mcp.Server) {
-	server.AddTool(&mcp.Tool{Name: "list_time_entries", Description: "List time entries with optional filters"}, r.listTimeEntries)
-	server.AddTool(&mcp.Tool{Name: "create_time_entry", Description: "Create a new time entry to log work"}, r.createTimeEntry)
-	server.AddTool(&mcp.Tool{Name: "update_time_entry", Description: "Update an existing time entry"}, r.updateTimeEntry)
-	server.AddTool(&mcp.Tool{Name: "delete_time_entry", Description: "Delete a time entry"}, r.deleteTimeEntry)
-	server.AddTool(&mcp.Tool{Name: "list_time_entry_activities", Description: "List available time entry activity types"}, r.listTimeEntryActivities)
+	addTool(server, "list_time_entries", "List time entries with optional filters",
+		newSchema(schemaProps{
+			"projectId":     schemaInt("Filter by project ID"),
+			"workPackageId": schemaInt("Filter by work package ID"),
+			"userId":        schemaInt("Filter by user ID"),
+			"offset":        schemaInt("Pagination offset"),
+			"pageSize":      schemaInt("Items per page"),
+			"sortBy":        schemaStr(`Sort criteria, e.g. "spentOn:desc"`),
+		}),
+		r.listTimeEntries)
+
+	addTool(server, "create_time_entry", "Create a new time entry to log work",
+		newSchema(schemaProps{
+			"hours":         schemaStr(`Hours spent, e.g. "8.5" or "PT8H30M"`),
+			"projectId":     schemaInt("Project ID"),
+			"workPackageId": schemaInt("Work package ID (optional)"),
+			"activityId":    schemaInt("Activity type ID"),
+			"comment":       schemaStr("Optional comment / description"),
+			"spentOn":       schemaStr("Date (YYYY-MM-DD, defaults to today)"),
+			"userId":        schemaInt("User ID (defaults to current user)"),
+		}, "hours"),
+		r.createTimeEntry)
+
+	addTool(server, "update_time_entry", "Update an existing time entry",
+		newSchema(schemaProps{
+			"id":         schemaInt("Time entry ID"),
+			"hours":      schemaStr("New hours value"),
+			"comment":    schemaStr("New comment"),
+			"spentOn":    schemaStr("New date (YYYY-MM-DD)"),
+			"activityId": schemaInt("New activity type ID"),
+		}, "id"),
+		r.updateTimeEntry)
+
+	addTool(server, "delete_time_entry", "Delete a time entry",
+		newSchema(schemaProps{"id": schemaInt("Time entry ID")}, "id"),
+		r.deleteTimeEntry)
+
+	addTool(server, "list_time_entry_activities", "List available time entry activity types",
+		noSchema, r.listTimeEntryActivities)
 }
 
 func (r *Registry) listTimeEntries(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListTimeEntriesArgs
 	parseArgs(req.Params.Arguments, &args)
 
-	opts := &openproject.ListTimeEntriesOptions{Offset: args.Offset, PageSize: args.PageSize}
+	opts := &openproject.ListTimeEntriesOptions{Offset: args.Offset, PageSize: args.PageSize, SortBy: firstNonEmpty(args.SortBy, args.OrderBy)}
 	var filters []openproject.TimeEntryFilter
 	if args.ProjectID > 0 {
 		filters = append(filters, openproject.TimeEntryFilter{Name: "project", Values: []string{fmt.Sprintf("%d", args.ProjectID)}})
 	}
 	if args.WorkPackageID > 0 {
-		filters = append(filters, openproject.TimeEntryFilter{Name: "workPackage", Values: []string{fmt.Sprintf("%d", args.WorkPackageID)}})
+		filters = append(filters,
+			openproject.TimeEntryFilter{Name: "entity_type", Values: []string{"WorkPackage"}},
+			openproject.TimeEntryFilter{Name: "entity_id", Values: []string{fmt.Sprintf("%d", args.WorkPackageID)}},
+		)
 	}
 	if args.UserID > 0 {
-		filters = append(filters, openproject.TimeEntryFilter{Name: "user", Values: []string{fmt.Sprintf("%d", args.UserID)}})
+		filters = append(filters, openproject.TimeEntryFilter{Name: "user_id", Values: []string{fmt.Sprintf("%d", args.UserID)}})
 	}
 	opts.Filters = filters
 

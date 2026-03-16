@@ -2,6 +2,7 @@ package openproject
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -10,11 +11,21 @@ import (
 
 // ListProjectsOptions contains options for listing projects.
 type ListProjectsOptions struct {
-	Offset   int
-	PageSize int
-	OrderBy  string
-	Select   []string
-	ShowRoot bool
+	Offset     int
+	PageSize   int
+	SortBy     string
+	OrderBy    string // Deprecated: use SortBy
+	Select     []string
+	Filters    []ProjectFilter
+	RawFilters string // overrides Filters when non-empty
+	ShowRoot   bool
+}
+
+// ProjectFilter represents a filter for projects.
+type ProjectFilter struct {
+	Name     string   `json:"name"`
+	Values   []string `json:"values"`
+	Operator string   `json:"operator,omitempty"`
 }
 
 // ListProjects retrieves all projects.
@@ -30,11 +41,22 @@ func (c *Client) ListProjects(ctx context.Context, opts *ListProjectsOptions) (*
 	if opts.PageSize > 0 {
 		params.Set("pageSize", strconv.Itoa(opts.PageSize))
 	}
-	if opts.OrderBy != "" {
-		params.Set("orderBy", opts.OrderBy)
+	if opts.SortBy != "" {
+		params.Set("sortBy", opts.SortBy)
+	} else if opts.OrderBy != "" {
+		params.Set("sortBy", opts.OrderBy)
 	}
 	if len(opts.Select) > 0 {
 		params.Set("select", strings.Join(opts.Select, ","))
+	}
+	if opts.RawFilters != "" {
+		params.Set("filters", opts.RawFilters)
+	} else if len(opts.Filters) > 0 {
+		filterJSON, err := jsonMarshalProjectFilters(opts.Filters)
+		if err != nil {
+			return nil, err
+		}
+		params.Set("filters", filterJSON)
 	}
 	if opts.ShowRoot {
 		params.Set("showRoot", "true")
@@ -50,6 +72,32 @@ func (c *Client) ListProjects(ctx context.Context, opts *ListProjectsOptions) (*
 		return nil, err
 	}
 	return &result, nil
+}
+
+// jsonMarshalProjectFilters marshals project filters to the API query format.
+func jsonMarshalProjectFilters(filters []ProjectFilter) (string, error) {
+	encoded := make([]map[string]map[string]interface{}, 0, len(filters))
+	for _, f := range filters {
+		if f.Name == "" {
+			continue
+		}
+		op := f.Operator
+		if op == "" {
+			op = "="
+		}
+		encoded = append(encoded, map[string]map[string]interface{}{
+			f.Name: {
+				"operator": op,
+				"values":   f.Values,
+			},
+		})
+	}
+
+	data, err := json.Marshal(encoded)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 // GetProject retrieves a specific project by ID.
