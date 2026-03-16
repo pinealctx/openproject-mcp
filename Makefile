@@ -50,17 +50,17 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
-# Run the application (stdio mode)
+# Run the application (stdio mode - MCP server)
 run:
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/openproject-mcp
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) .
 	$(BUILD_DIR)/$(BINARY_NAME)
 
 # Run with SSE transport
 run-sse:
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/openproject-mcp
-	$(BUILD_DIR)/$(BINARY_NAME) -transport=sse
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) .
+	$(BUILD_DIR)/$(BINARY_NAME) mcp -transport=sse
 
 # Run with HTTP transport
 run-http:
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/openproject-mcp
-	$(BUILD_DIR)/$(BINARY_NAME) -transport=http
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) .
+	$(BUILD_DIR)/$(BINARY_NAME) mcp -transport=http

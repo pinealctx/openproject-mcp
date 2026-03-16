@@ -28,7 +28,7 @@ make build   # output: ./build/openproject-mcp
 
 ```bash
 # Build
-go build -o openproject-mcp ./cmd/openproject-mcp
+go build -o openproject-mcp .
 
 # Run in stdio mode (Claude Desktop / MCP clients)
 OPENPROJECT_URL=https://your-instance.openproject.com \
@@ -36,13 +36,157 @@ OPENPROJECT_API_KEY=your-api-key \
 ./openproject-mcp
 ```
 
+## Usage Modes
+
+This tool operates in two modes:
+
+### 1. MCP Server Mode (default)
+
+Starts an MCP server for AI assistants. No subcommand needed — just run the binary.
+
+```bash
+# stdio mode (default) - for Claude Desktop, Cursor, etc.
+./openproject-mcp
+
+# SSE mode - for web-based MCP clients
+./openproject-mcp mcp -t sse -p 3000
+
+# HTTP mode - for HTTP-based MCP clients
+./openproject-mcp mcp -t http -p 8080
+```
+
+### 2. CLI Mode
+
+Direct command-line interaction with OpenProject API. Useful for scripting and automation.
+
+```bash
+# List all projects
+./openproject-mcp project list
+
+# Get project details
+./openproject-mcp project get 42
+
+# Create a new project
+./openproject-mcp project create -n "My Project" -i "my-project"
+
+# List work packages in a project
+./openproject-mcp wp list -p 42
+
+# Create a work package
+./openproject-mcp wp create -p 42 -s "Implement feature X"
+
+# Search across OpenProject
+./openproject-mcp search "bug"
+
+# Output as JSON for scripting
+./openproject-mcp project list -o json
+```
+
+## CLI Commands
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `project` | `proj`, `p` | Manage projects |
+| `work-package` | `wp` | Manage work packages (tasks, bugs, features) |
+| `user` | `u` | Manage users |
+| `membership` | `member`, `m` | Manage project memberships |
+| `time-entry` | `time`, `te` | Manage time entries (work logs) |
+| `board` | - | Manage Kanban boards |
+| `notification` | `notify` | Manage notifications |
+| `search` | - | Search across projects, work packages, users |
+| `status` | - | List work package statuses |
+| `priority` | `priorities` | List work package priorities |
+| `type` | `types` | List work package types |
+| `role` | `roles` | List user roles |
+| `version` | - | Manage project versions/milestones |
+| `mcp` | - | Start MCP server |
+
+### CLI Examples
+
+```bash
+# === Projects ===
+./openproject-mcp project list
+./openproject-mcp project get 42
+./openproject-mcp project create -n "Website Redesign" -i "website-redesign"
+./openproject-mcp project update 42 -n "New Name"
+./openproject-mcp project delete 42
+
+# === Work Packages ===
+./openproject-mcp wp list -p 42
+./openproject-mcp wp get 123
+./openproject-mcp wp create -p 42 -s "Fix login bug" -d "Description here"
+./openproject-mcp wp update 123 --status "In Progress" --progress 50
+./openproject-mcp wp update 123 --assignee 5
+./openproject-mcp wp delete 123
+
+# === Work Package Relations ===
+./openproject-mcp wp set-parent 123 -p 100
+./openproject-mcp wp relation create --from 123 --to 456 --type blocks
+
+# === Users ===
+./openproject-mcp user list
+./openproject-mcp user get 5
+./openproject-mcp user me
+
+# === Time Entries ===
+./openproject-mcp time-entry list -p 42
+./openproject-mcp time-entry create -H 4 -c "Worked on feature X"
+./openproject-mcp time-entry create -H 8 -w 123 -d 2024-01-15
+
+# === Memberships ===
+./openproject-mcp membership list -p 42
+./openproject-mcp membership create -p 42 -u 5 -r "3,4"
+./openproject-mcp membership delete 123
+
+# === Search ===
+./openproject-mcp search "bug"
+./openproject-mcp search "website" -t project
+./openproject-mcp search "john" -t user
+
+# === Notifications ===
+./openproject-mcp notification list
+./openproject-mcp notification list -u      # unread only
+./openproject-mcp notification read-all
+```
+
+Run `./openproject-mcp [command] --help` for detailed usage of each command.
+
 ## Transport Modes
 
-| Mode | Command | Use case |
+| Mode | Command | Use Case |
 |------|---------|----------|
-| `stdio` | `./openproject-mcp` (default) | Claude Desktop, single-user |
-| `sse` | `./openproject-mcp -transport sse -port 3000` | SSE-based MCP clients |
-| `http` | `./openproject-mcp -transport http -port 8080` | Streamable HTTP, multi-tenant |
+| `stdio` | `./openproject-mcp` or `./openproject-mcp mcp -t stdio` | Claude Desktop, Cursor, Continue (default) |
+| `sse` | `./openproject-mcp mcp -t sse -p 3000` | Server-Sent Events for web-based MCP clients |
+| `http` | `./openproject-mcp mcp -t http -p 8080` | Streamable HTTP for web-based clients |
+
+### stdio Mode (Default)
+
+Communication via stdin/stdout. The server reads JSON-RPC messages from stdin and writes responses to stdout. All logging is suppressed to avoid protocol interference.
+
+**Compatible with:** Claude Desktop, Cursor, Continue, Zed, and other MCP clients that spawn the server as a subprocess.
+
+```bash
+# Set environment variables
+export OPENPROJECT_URL="https://your-instance.openproject.com"
+export OPENPROJECT_API_KEY="your-api-token"
+
+# Start MCP server (all three commands are equivalent)
+./openproject-mcp
+./openproject-mcp mcp
+./openproject-mcp mcp -t stdio
+```
+
+### SSE / HTTP Mode
+
+For web-based MCP clients. Requires a port to listen on.
+
+```bash
+# SSE mode
+./openproject-mcp mcp -t sse -p 3000
+
+# HTTP mode
+./openproject-mcp mcp -t http -p 8080
+```
 
 ## Credential Modes
 
@@ -53,7 +197,7 @@ Set credentials via environment variables at startup. All requests share the sam
 ```bash
 export OPENPROJECT_URL=https://your-instance.openproject.com
 export OPENPROJECT_API_KEY=your-api-key
-./openproject-mcp -transport http -port 8080
+./openproject-mcp mcp -t http -p 8080
 ```
 
 > For `stdio` transport, credentials are **required** at startup.
@@ -63,7 +207,7 @@ export OPENPROJECT_API_KEY=your-api-key
 Start without credentials; each HTTP/SSE client supplies its own via request headers.
 
 ```bash
-./openproject-mcp -transport http -port 8080
+./openproject-mcp mcp -t http -p 8080
 # no env vars needed
 ```
 
@@ -86,13 +230,18 @@ If neither server-level nor per-request credentials are available, the server re
 | `TRANSPORT` | No | `stdio`, `sse`, `http` (default: `stdio`) |
 | `PORT` | No | Port for SSE/HTTP transport (default: `8080`) |
 
-## Claude Desktop Configuration
+## MCP Client Configuration
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "openproject": {
       "command": "/path/to/openproject-mcp",
+      "args": [],
       "env": {
         "OPENPROJECT_URL": "https://your-instance.openproject.com",
         "OPENPROJECT_API_KEY": "your-api-key"
@@ -102,7 +251,26 @@ If neither server-level nor per-request credentials are available, the server re
 }
 ```
 
-## VS Code / HTTP Client Configuration
+### Cursor
+
+Add to `.cursor/mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "openproject": {
+      "command": "/path/to/openproject-mcp",
+      "args": [],
+      "env": {
+        "OPENPROJECT_URL": "https://your-instance.openproject.com",
+        "OPENPROJECT_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+### VS Code / HTTP Client
 
 ```json
 {
@@ -110,6 +278,24 @@ If neither server-level nor per-request credentials are available, the server re
     "openproject": {
       "type": "http",
       "url": "http://localhost:8080/mcp"
+  }
+}
+```
+
+### Zed
+
+Add to your Zed settings:
+
+```json
+{
+  "context_servers": {
+    "openproject": {
+      "command": "/path/to/openproject-mcp",
+      "args": [],
+      "env": {
+        "OPENPROJECT_URL": "https://your-instance.openproject.com",
+        "OPENPROJECT_API_KEY": "your-api-key"
+      }
     }
   }
 }
