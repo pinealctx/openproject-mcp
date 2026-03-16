@@ -14,7 +14,6 @@ type ListUsersOptions struct {
 	Offset   int
 	PageSize int
 	SortBy   string
-	OrderBy  string // Deprecated: use SortBy
 	Select   []string
 	Filters  []UserFilter
 }
@@ -41,8 +40,6 @@ func (c *Client) ListUsers(ctx context.Context, opts *ListUsersOptions) (*UserLi
 	}
 	if opts.SortBy != "" {
 		params.Set("sortBy", opts.SortBy)
-	} else if opts.OrderBy != "" {
-		params.Set("sortBy", opts.OrderBy)
 	}
 	if len(opts.Select) > 0 {
 		params.Set("select", strings.Join(opts.Select, ","))

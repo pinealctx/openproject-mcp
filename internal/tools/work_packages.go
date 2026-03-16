@@ -14,7 +14,6 @@ type ListWorkPackagesArgs struct {
 	Offset    int    `json:"offset,omitempty"`
 	PageSize  int    `json:"pageSize,omitempty"`
 	SortBy    string `json:"sortBy,omitempty"`
-	OrderBy   string `json:"orderBy,omitempty"`
 	Filters   string `json:"filters,omitempty"`
 }
 
@@ -135,7 +134,7 @@ func (r *Registry) listWorkPackages(ctx context.Context, req *mcp.CallToolReques
 	opts := &openproject.ListWorkPackagesOptions{
 		Offset:     args.Offset,
 		PageSize:   args.PageSize,
-		SortBy:     firstNonEmpty(args.SortBy, args.OrderBy),
+		SortBy:     args.SortBy,
 		RawFilters: args.Filters,
 	}
 	var list *openproject.WorkPackageList
@@ -303,7 +302,9 @@ func (r *Registry) deleteWorkPackage(ctx context.Context, req *mcp.CallToolReque
 
 func (r *Registry) listTypes(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListTypesArgs
-	parseArgs(req.Params.Arguments, &args)
+	if err := parseArgs(req.Params.Arguments, &args); err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+	}
 
 	var list *openproject.TypeList
 	var err error

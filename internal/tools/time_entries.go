@@ -15,7 +15,6 @@ type ListTimeEntriesArgs struct {
 	Offset        int    `json:"offset,omitempty"`
 	PageSize      int    `json:"pageSize,omitempty"`
 	SortBy        string `json:"sortBy,omitempty"`
-	OrderBy       string `json:"orderBy,omitempty"`
 }
 
 type CreateTimeEntryArgs struct {
@@ -84,9 +83,11 @@ func (r *Registry) registerTimeEntryTools(server *mcp.Server) {
 
 func (r *Registry) listTimeEntries(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListTimeEntriesArgs
-	parseArgs(req.Params.Arguments, &args)
+	if err := parseArgs(req.Params.Arguments, &args); err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+	}
 
-	opts := &openproject.ListTimeEntriesOptions{Offset: args.Offset, PageSize: args.PageSize, SortBy: firstNonEmpty(args.SortBy, args.OrderBy)}
+	opts := &openproject.ListTimeEntriesOptions{Offset: args.Offset, PageSize: args.PageSize, SortBy: args.SortBy}
 	var filters []openproject.TimeEntryFilter
 	if args.ProjectID > 0 {
 		filters = append(filters, openproject.TimeEntryFilter{Name: "project", Values: []string{fmt.Sprintf("%d", args.ProjectID)}})

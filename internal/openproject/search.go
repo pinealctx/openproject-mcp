@@ -35,28 +35,20 @@ type SearchOptions struct {
 
 // Search performs a search across OpenProject resources.
 func (c *Client) Search(ctx context.Context, query, resourceType string, limit int) (*SearchResults, error) {
-		if query == "" {
-			return nil, fmt.Errorf("query is required")
-		}
-		if limit <= 0 {
-			limit = 10
-		}
-		if resourceType == "" {
-			resourceType = "all"
-		}
-
-		path := fmt.Sprintf("/search?query=%s&limit=%d&type=%s", query, limit, resourceType)
-		var results SearchResults
-		if err := c.Get(ctx, path, &results); err != nil {
-			return nil, err
-		}
-		return &results, nil
-}
-
-// outputSearchResults formats search results for text output.
-func outputSearchResults(results *SearchResults) error {
-	for _, r := range results.Embedded.Elements {
-		fmt.Printf("%d\t%s\t%s\n", r.ID, r.Type, r.Title)
+	if query == "" {
+		return nil, fmt.Errorf("query is required")
 	}
-	return nil
+	if limit <= 0 {
+		limit = 10
+	}
+	if resourceType == "" {
+		resourceType = "all"
+	}
+
+	path := fmt.Sprintf("/search?query=%s&limit=%d&type=%s", query, limit, resourceType)
+	var results SearchResults
+	if err := c.Get(ctx, path, &results); err != nil {
+		return nil, err
+	}
+	return &results, nil
 }

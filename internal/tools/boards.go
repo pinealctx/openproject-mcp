@@ -105,7 +105,9 @@ func (r *Registry) registerBoardTools(server *mcp.Server) {
 
 func (r *Registry) getBoards(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args GetBoardsArgs
-	parseArgs(req.Params.Arguments, &args)
+	if err := parseArgs(req.Params.Arguments, &args); err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+	}
 
 	var filters string
 	if args.ProjectID > 0 {

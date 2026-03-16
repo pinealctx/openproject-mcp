@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -70,6 +70,6 @@ func init() {
 	versionCreateCmd.Flags().StringVarP(&versionCreateDescription, "description", "d", "", "Description")
 	versionCreateCmd.Flags().StringVar(&versionCreateStartDate, "start", "", "Start date (YYYY-MM-DD)")
 	versionCreateCmd.Flags().StringVar(&versionCreateEndDate, "end", "", "End date (YYYY-MM-DD)")
-	versionCreateCmd.MarkFlagRequired("project")
-	versionCreateCmd.MarkFlagRequired("name")
+	_ = versionCreateCmd.MarkFlagRequired("project")
+	_ = versionCreateCmd.MarkFlagRequired("name")
 }

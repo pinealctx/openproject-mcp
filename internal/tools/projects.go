@@ -14,7 +14,6 @@ type ListProjectsArgs struct {
 	Offset   int    `json:"offset,omitempty"`
 	PageSize int    `json:"pageSize,omitempty"`
 	SortBy   string `json:"sortBy,omitempty"`
-	OrderBy  string `json:"orderBy,omitempty"`
 	Filters  string `json:"filters,omitempty"`
 }
 
@@ -107,7 +106,7 @@ func (r *Registry) listProjects(ctx context.Context, req *mcp.CallToolRequest) (
 	opts := &openproject.ListProjectsOptions{
 		Offset:     args.Offset,
 		PageSize:   args.PageSize,
-		SortBy:     firstNonEmpty(args.SortBy, args.OrderBy),
+		SortBy:     args.SortBy,
 		RawFilters: args.Filters,
 	}
 

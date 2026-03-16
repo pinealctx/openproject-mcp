@@ -12,7 +12,6 @@ type ListUsersArgs struct {
 	Offset   int    `json:"offset,omitempty"`
 	PageSize int    `json:"pageSize,omitempty"`
 	SortBy   string `json:"sortBy,omitempty"`
-	OrderBy  string `json:"orderBy,omitempty"`
 }
 
 type GetUserArgs struct {
@@ -38,9 +37,11 @@ func (r *Registry) registerUserTools(server *mcp.Server) {
 
 func (r *Registry) listUsers(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListUsersArgs
-	parseArgs(req.Params.Arguments, &args)
+	if err := parseArgs(req.Params.Arguments, &args); err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+	}
 
-	opts := &openproject.ListUsersOptions{Offset: args.Offset, PageSize: args.PageSize, SortBy: firstNonEmpty(args.SortBy, args.OrderBy)}
+	opts := &openproject.ListUsersOptions{Offset: args.Offset, PageSize: args.PageSize, SortBy: args.SortBy}
 	users, err := r.client.ListUsers(ctx, opts)
 	if err != nil {
 		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list users: %v", err)}}}, nil

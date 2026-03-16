@@ -77,7 +77,9 @@ func (r *Registry) registerMembershipTools(server *mcp.Server) {
 
 func (r *Registry) listMemberships(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListMembershipsArgs
-	parseArgs(req.Params.Arguments, &args)
+	if err := parseArgs(req.Params.Arguments, &args); err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+	}
 
 	opts := &openproject.ListMembershipsOptions{Offset: args.Offset, PageSize: args.PageSize}
 	var list *openproject.MembershipList

@@ -43,7 +43,9 @@ func (r *Registry) registerNotificationTools(server *mcp.Server) {
 
 func (r *Registry) listNotifications(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListNotificationsArgs
-	parseArgs(req.Params.Arguments, &args)
+	if err := parseArgs(req.Params.Arguments, &args); err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+	}
 
 	opts := &openproject.ListNotificationsOptions{
 		PageSize: args.PageSize,

@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
 	boardListProjectID int
 	boardListPageSize  int
 
-	boardCreateProjectID  int
+	boardCreateProjectID   int
 	boardCreateRowCount    int
 	boardCreateColumnCount int
 
@@ -239,7 +239,7 @@ func init() {
 	boardCreateCmd.Flags().IntVarP(&boardCreateProjectID, "project", "p", 0, "Project ID (required)")
 	boardCreateCmd.Flags().IntVarP(&boardCreateRowCount, "rows", "r", 1, "Number of rows")
 	boardCreateCmd.Flags().IntVarP(&boardCreateColumnCount, "columns", "c", 3, "Number of columns")
-	boardCreateCmd.MarkFlagRequired("project")
+	_ = boardCreateCmd.MarkFlagRequired("project")
 
 	// Update flags
 	boardUpdateCmd.Flags().IntVarP(&boardUpdateRowCount, "rows", "r", 0, "Number of rows")

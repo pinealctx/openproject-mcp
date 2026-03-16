@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -44,8 +44,8 @@ var (
 
 // workPackageCmd represents the work-package command.
 var workPackageCmd = &cobra.Command{
-	Use:     "work-package",
-	Short:   "Manage work packages (tasks, bugs, features, etc.)",
+	Use:   "work-package",
+	Short: "Manage work packages (tasks, bugs, features, etc.)",
 	Long: `Manage work packages in OpenProject.
 
 Work packages are the core work items in OpenProject. They can represent:
@@ -427,8 +427,8 @@ func init() {
 	wpCreateCmd.Flags().StringVar(&wpCreateStartDate, "start", "", "Start date (YYYY-MM-DD)")
 	wpCreateCmd.Flags().StringVar(&wpCreateDueDate, "due", "", "Due date (YYYY-MM-DD)")
 	wpCreateCmd.Flags().StringVar(&wpCreateEstimatedTime, "estimate", "", "Estimated time (e.g., PT4H)")
-	wpCreateCmd.MarkFlagRequired("project")
-	wpCreateCmd.MarkFlagRequired("subject")
+	_ = wpCreateCmd.MarkFlagRequired("project")
+	_ = wpCreateCmd.MarkFlagRequired("subject")
 
 	// Update flags
 	wpUpdateCmd.Flags().StringVarP(&wpUpdateSubject, "subject", "s", "", "Work package subject")
@@ -443,7 +443,7 @@ func init() {
 
 	// Set parent flags
 	wpSetParentCmd.Flags().IntVarP(&wpParentID, "parent", "p", 0, "Parent work package ID (required)")
-	wpSetParentCmd.MarkFlagRequired("parent")
+	_ = wpSetParentCmd.MarkFlagRequired("parent")
 
 	// Relation create flags
 	wpRelationCreateCmd.Flags().IntVarP(&wpRelationFromID, "from", "f", 0, "From work package ID (required)")
@@ -451,6 +451,6 @@ func init() {
 	wpRelationCreateCmd.Flags().StringVarP(&wpRelationType, "type", "y", "relates", "Relation type (relates, follows, precedes, blocks, blocked_by, duplicates, duplicated)")
 	wpRelationCreateCmd.Flags().StringVarP(&wpRelationDesc, "description", "d", "", "Description")
 	wpRelationCreateCmd.Flags().IntVar(&wpRelationDelay, "delay", 0, "Delay in days")
-	wpRelationCreateCmd.MarkFlagRequired("from")
-	wpRelationCreateCmd.MarkFlagRequired("to")
+	_ = wpRelationCreateCmd.MarkFlagRequired("from")
+	_ = wpRelationCreateCmd.MarkFlagRequired("to")
 }

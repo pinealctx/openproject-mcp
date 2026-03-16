@@ -134,11 +134,11 @@ type WorkPackage struct {
 // WorkPackageLinks represents links specific to work packages.
 type WorkPackageLinks struct {
 	Links
-	Children    *Link   `json:"children,omitempty"`
-	Relations   *Link   `json:"relations,omitempty"`
-	Attachments *Link   `json:"attachments,omitempty"`
-	Watchers    *Link   `json:"watchers,omitempty"`
-	Categories  []*Link `json:"categories,omitempty"`
+	Children    json.RawMessage `json:"children,omitempty"`
+	Relations   *Link           `json:"relations,omitempty"`
+	Attachments *Link           `json:"attachments,omitempty"`
+	Watchers    *Link           `json:"watchers,omitempty"`
+	Categories  []*Link         `json:"categories,omitempty"`
 }
 
 // WorkPackageList represents a list of work packages.

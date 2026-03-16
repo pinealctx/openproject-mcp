@@ -14,7 +14,6 @@ type ListWorkPackagesOptions struct {
 	Offset     int
 	PageSize   int
 	SortBy     string
-	OrderBy    string // Deprecated: use SortBy
 	Select     []string
 	Filters    []WorkPackageFilter
 	RawFilters string // overrides Filters when non-empty
@@ -22,9 +21,9 @@ type ListWorkPackagesOptions struct {
 
 // WorkPackageFilter represents a filter for work packages.
 type WorkPackageFilter struct {
-	Name     string        `json:"name"`
-	Values   []interface{} `json:"values"`
-	Operator string        `json:"operator,omitempty"`
+	Name     string `json:"name"`
+	Values   []any  `json:"values"`
+	Operator string `json:"operator,omitempty"`
 }
 
 // ListWorkPackages retrieves work packages with optional filters.
@@ -41,9 +40,7 @@ func (c *Client) ListWorkPackages(ctx context.Context, opts *ListWorkPackagesOpt
 		params.Set("pageSize", strconv.Itoa(opts.PageSize))
 	}
 	if opts.SortBy != "" {
-		params.Set("sortBy", opts.SortBy)
-	} else if opts.OrderBy != "" {
-		params.Set("sortBy", opts.OrderBy)
+		params.Set("sortBy", normalizeSortBy(opts.SortBy))
 	}
 	if len(opts.Select) > 0 {
 		params.Set("select", strings.Join(opts.Select, ","))
@@ -84,9 +81,7 @@ func (c *Client) ListProjectWorkPackages(ctx context.Context, projectID int, opt
 		params.Set("pageSize", strconv.Itoa(opts.PageSize))
 	}
 	if opts.SortBy != "" {
-		params.Set("sortBy", opts.SortBy)
-	} else if opts.OrderBy != "" {
-		params.Set("sortBy", opts.OrderBy)
+		params.Set("sortBy", normalizeSortBy(opts.SortBy))
 	}
 	if len(opts.Select) > 0 {
 		params.Set("select", strings.Join(opts.Select, ","))
@@ -275,4 +270,45 @@ func jsonMarshalFilters(filters []WorkPackageFilter) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// normalizeSortBy converts shorthand syntax like "updatedAt:desc" into
+// OpenProject's JSON sort format: [["updatedAt","desc"]].
+func normalizeSortBy(sortBy string) string {
+	s := strings.TrimSpace(sortBy)
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(s, "[") {
+		return s
+	}
+
+	parts := strings.Split(s, ",")
+	encoded := make([][]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		field := p
+		order := "asc"
+		if idx := strings.LastIndex(p, ":"); idx > 0 {
+			field = strings.TrimSpace(p[:idx])
+			candidate := strings.ToLower(strings.TrimSpace(p[idx+1:]))
+			if candidate == "asc" || candidate == "desc" {
+				order = candidate
+			}
+		}
+		if field != "" {
+			encoded = append(encoded, []string{field, order})
+		}
+	}
+	if len(encoded) == 0 {
+		return s
+	}
+	b, err := json.Marshal(encoded)
+	if err != nil {
+		return s
+	}
+	return string(b)
 }

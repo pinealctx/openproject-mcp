@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -22,8 +22,8 @@ var (
 
 // membershipCmd represents the membership command.
 var membershipCmd = &cobra.Command{
-	Use:     "membership",
-	Short:   "Manage project memberships",
+	Use:   "membership",
+	Short: "Manage project memberships",
 	Long: `Manage project memberships and user roles.
 
 Memberships define which users have access to which projects and what roles
@@ -186,11 +186,11 @@ func init() {
 	membershipCreateCmd.Flags().IntVarP(&membershipCreateProjectID, "project", "p", 0, "Project ID (required)")
 	membershipCreateCmd.Flags().IntVarP(&membershipCreateUserID, "user", "u", 0, "User ID (required)")
 	membershipCreateCmd.Flags().StringVarP(&membershipCreateRoles, "roles", "r", "", "Role IDs (comma-separated, required)")
-	membershipCreateCmd.MarkFlagRequired("project")
-	membershipCreateCmd.MarkFlagRequired("user")
-	membershipCreateCmd.MarkFlagRequired("roles")
+	_ = membershipCreateCmd.MarkFlagRequired("project")
+	_ = membershipCreateCmd.MarkFlagRequired("user")
+	_ = membershipCreateCmd.MarkFlagRequired("roles")
 
 	// Update flags
 	membershipUpdateCmd.Flags().StringVarP(&membershipUpdateRoles, "roles", "r", "", "Role IDs (comma-separated)")
-	membershipUpdateCmd.MarkFlagRequired("roles")
+	_ = membershipUpdateCmd.MarkFlagRequired("roles")
 }

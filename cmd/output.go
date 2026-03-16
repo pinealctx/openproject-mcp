@@ -103,25 +103,25 @@ func newTabWriter() *tabwriter.Writer {
 
 func outputProjectList(list *openproject.ProjectList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tIDENTIFIER\tNAME\tACTIVE\tPUBLIC")
+	_, _ = fmt.Fprintln(w, "ID\tIDENTIFIER\tNAME\tACTIVE\tPUBLIC")
 	for _, p := range list.Embedded.Elements {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%t\t%t\n", p.ID, p.Identifier, p.Name, p.Active, p.Public)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%t\t%t\n", p.ID, p.Identifier, p.Name, p.Active, p.Public)
 	}
 	return w.Flush()
 }
 
 func outputProject(p *openproject.Project) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", p.ID)
-	fmt.Fprintf(outputWriter, "Identifier: %s\n", p.Identifier)
-	fmt.Fprintf(outputWriter, "Name: %s\n", p.Name)
-	fmt.Fprintf(outputWriter, "Description: %s\n", p.Description.String())
-	fmt.Fprintf(outputWriter, "Active: %t\n", p.Active)
-	fmt.Fprintf(outputWriter, "Public: %t\n", p.Public)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", p.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Identifier: %s\n", p.Identifier)
+	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", p.Name)
+	_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", p.Description.String())
+	_, _ = fmt.Fprintf(outputWriter, "Active: %t\n", p.Active)
+	_, _ = fmt.Fprintf(outputWriter, "Public: %t\n", p.Public)
 	if p.CreatedAt != nil {
-		fmt.Fprintf(outputWriter, "Created: %s\n", p.CreatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", p.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	if p.UpdatedAt != nil {
-		fmt.Fprintf(outputWriter, "Updated: %s\n", p.UpdatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Updated: %s\n", p.UpdatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
@@ -130,7 +130,7 @@ func outputProject(p *openproject.Project) error {
 
 func outputWorkPackageList(list *openproject.WorkPackageList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tSUBJECT\tTYPE\tSTATUS\tASSIGNEE\tDUE")
+	_, _ = fmt.Fprintln(w, "ID\tSUBJECT\tTYPE\tSTATUS\tASSIGNEE\tDUE")
 	for _, wp := range list.Embedded.Elements {
 		assignee := extractAssignee(wp.Links)
 		due := wp.DueDate
@@ -139,34 +139,34 @@ func outputWorkPackageList(list *openproject.WorkPackageList) error {
 		}
 		typeName := extractTypeName(wp.Links)
 		statusName := extractStatusName(wp.Links)
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", wp.ID, truncate(wp.Subject, 40), typeName, statusName, assignee, due)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", wp.ID, truncate(wp.Subject, 40), typeName, statusName, assignee, due)
 	}
 	return w.Flush()
 }
 
 func outputWorkPackage(wp *openproject.WorkPackage) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", wp.ID)
-	fmt.Fprintf(outputWriter, "Subject: %s\n", wp.Subject)
-	fmt.Fprintf(outputWriter, "Description: %s\n", wp.Description.String())
-	fmt.Fprintf(outputWriter, "Type: %s\n", extractTypeName(wp.Links))
-	fmt.Fprintf(outputWriter, "Status: %s\n", extractStatusName(wp.Links))
-	fmt.Fprintf(outputWriter, "Priority: %s\n", extractPriorityName(wp.Links))
-	fmt.Fprintf(outputWriter, "Assignee: %s\n", extractAssignee(wp.Links))
-	fmt.Fprintf(outputWriter, "Progress: %d%%\n", wp.PercentageDone)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", wp.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Subject: %s\n", wp.Subject)
+	_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", wp.Description.String())
+	_, _ = fmt.Fprintf(outputWriter, "Type: %s\n", extractTypeName(wp.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Status: %s\n", extractStatusName(wp.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Priority: %s\n", extractPriorityName(wp.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Assignee: %s\n", extractAssignee(wp.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Progress: %d%%\n", wp.PercentageDone)
 	if wp.EstimatedTime != "" {
-		fmt.Fprintf(outputWriter, "Estimated: %s\n", wp.EstimatedTime)
+		_, _ = fmt.Fprintf(outputWriter, "Estimated: %s\n", wp.EstimatedTime)
 	}
 	if wp.StartDate != "" {
-		fmt.Fprintf(outputWriter, "Start: %s\n", wp.StartDate)
+		_, _ = fmt.Fprintf(outputWriter, "Start: %s\n", wp.StartDate)
 	}
 	if wp.DueDate != "" {
-		fmt.Fprintf(outputWriter, "Due: %s\n", wp.DueDate)
+		_, _ = fmt.Fprintf(outputWriter, "Due: %s\n", wp.DueDate)
 	}
 	if wp.CreatedAt != nil {
-		fmt.Fprintf(outputWriter, "Created: %s\n", wp.CreatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", wp.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	if wp.UpdatedAt != nil {
-		fmt.Fprintf(outputWriter, "Updated: %s\n", wp.UpdatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Updated: %s\n", wp.UpdatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
@@ -175,23 +175,23 @@ func outputWorkPackage(wp *openproject.WorkPackage) error {
 
 func outputUserList(list *openproject.UserList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tLOGIN\tNAME\tEMAIL\tSTATUS")
+	_, _ = fmt.Fprintln(w, "ID\tLOGIN\tNAME\tEMAIL\tSTATUS")
 	for _, u := range list.Embedded.Elements {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", u.ID, u.Login, u.Name, u.Email, u.Status)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", u.ID, u.Login, u.Name, u.Email, u.Status)
 	}
 	return w.Flush()
 }
 
 func outputUser(u *openproject.User) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", u.ID)
-	fmt.Fprintf(outputWriter, "Login: %s\n", u.Login)
-	fmt.Fprintf(outputWriter, "Name: %s\n", u.Name)
-	fmt.Fprintf(outputWriter, "Email: %s\n", u.Email)
-	fmt.Fprintf(outputWriter, "Admin: %t\n", u.Admin)
-	fmt.Fprintf(outputWriter, "Status: %s\n", u.Status)
-	fmt.Fprintf(outputWriter, "Language: %s\n", u.Language)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", u.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Login: %s\n", u.Login)
+	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", u.Name)
+	_, _ = fmt.Fprintf(outputWriter, "Email: %s\n", u.Email)
+	_, _ = fmt.Fprintf(outputWriter, "Admin: %t\n", u.Admin)
+	_, _ = fmt.Fprintf(outputWriter, "Status: %s\n", u.Status)
+	_, _ = fmt.Fprintf(outputWriter, "Language: %s\n", u.Language)
 	if u.CreatedAt != nil {
-		fmt.Fprintf(outputWriter, "Created: %s\n", u.CreatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", u.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
@@ -200,23 +200,23 @@ func outputUser(u *openproject.User) error {
 
 func outputMembershipList(list *openproject.MembershipList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tPROJECT\tUSER\tROLES")
+	_, _ = fmt.Fprintln(w, "ID\tPROJECT\tUSER\tROLES")
 	for _, m := range list.Embedded.Elements {
 		project := extractProjectName(m.Links)
 		user := extractPrincipalName(m.Links)
 		roles := extractRoleNames(m.Links)
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", m.ID, project, user, roles)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", m.ID, project, user, roles)
 	}
 	return w.Flush()
 }
 
 func outputMembership(m *openproject.Membership) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", m.ID)
-	fmt.Fprintf(outputWriter, "Project: %s\n", extractProjectName(m.Links))
-	fmt.Fprintf(outputWriter, "User: %s\n", extractPrincipalName(m.Links))
-	fmt.Fprintf(outputWriter, "Roles: %s\n", extractRoleNames(m.Links))
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", m.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Project: %s\n", extractProjectName(m.Links))
+	_, _ = fmt.Fprintf(outputWriter, "User: %s\n", extractPrincipalName(m.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Roles: %s\n", extractRoleNames(m.Links))
 	if m.CreatedAt != nil {
-		fmt.Fprintf(outputWriter, "Created: %s\n", m.CreatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", m.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
@@ -225,36 +225,36 @@ func outputMembership(m *openproject.Membership) error {
 
 func outputTimeEntryList(list *openproject.TimeEntryList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tDATE\tHOURS\tUSER\tPROJECT\tCOMMENT")
+	_, _ = fmt.Fprintln(w, "ID\tDATE\tHOURS\tUSER\tPROJECT\tCOMMENT")
 	for _, t := range list.Embedded.Elements {
 		user := extractTimeEntryUser(t.Links)
 		project := extractTimeEntryProject(t.Links)
 		comment := truncate(t.Comment, 30)
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", t.ID, t.SpentOn, t.Hours, user, project, comment)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", t.ID, t.SpentOn, t.Hours, user, project, comment)
 	}
 	return w.Flush()
 }
 
 func outputTimeEntry(t *openproject.TimeEntry) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", t.ID)
-	fmt.Fprintf(outputWriter, "Date: %s\n", t.SpentOn)
-	fmt.Fprintf(outputWriter, "Hours: %s\n", t.Hours)
-	fmt.Fprintf(outputWriter, "User: %s\n", extractTimeEntryUser(t.Links))
-	fmt.Fprintf(outputWriter, "Project: %s\n", extractTimeEntryProject(t.Links))
-	fmt.Fprintf(outputWriter, "Work Package: %s\n", extractTimeEntryWorkPackage(t.Links))
-	fmt.Fprintf(outputWriter, "Activity: %s\n", extractTimeEntryActivity(t.Links))
-	fmt.Fprintf(outputWriter, "Comment: %s\n", t.Comment)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", t.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Date: %s\n", t.SpentOn)
+	_, _ = fmt.Fprintf(outputWriter, "Hours: %s\n", t.Hours)
+	_, _ = fmt.Fprintf(outputWriter, "User: %s\n", extractTimeEntryUser(t.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Project: %s\n", extractTimeEntryProject(t.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Work Package: %s\n", extractTimeEntryWorkPackage(t.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Activity: %s\n", extractTimeEntryActivity(t.Links))
+	_, _ = fmt.Fprintf(outputWriter, "Comment: %s\n", t.Comment)
 	if t.CreatedAt != nil {
-		fmt.Fprintf(outputWriter, "Created: %s\n", t.CreatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", t.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
 
 func outputTimeEntryActivityList(list *openproject.TimeEntryActivityList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tACTIVE")
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tACTIVE")
 	for _, a := range list.Embedded.Elements {
-		fmt.Fprintf(w, "%d\t%s\t%t\t%t\n", a.ID, a.Name, a.IsDefault, a.Active)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%t\t%t\n", a.ID, a.Name, a.IsDefault, a.Active)
 	}
 	return w.Flush()
 }
@@ -263,7 +263,7 @@ func outputTimeEntryActivityList(list *openproject.TimeEntryActivityList) error 
 
 func outputVersionList(list *openproject.VersionList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tNAME\tSTATUS\tSTART\tEND")
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tSTATUS\tSTART\tEND")
 	for _, v := range list.Embedded.Elements {
 		start := v.StartDate
 		if start == "" {
@@ -273,24 +273,24 @@ func outputVersionList(list *openproject.VersionList) error {
 		if end == "" {
 			end = "-"
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", v.ID, v.Name, v.Status, start, end)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", v.ID, v.Name, v.Status, start, end)
 	}
 	return w.Flush()
 }
 
 func outputVersion(v *openproject.Version) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", v.ID)
-	fmt.Fprintf(outputWriter, "Name: %s\n", v.Name)
-	fmt.Fprintf(outputWriter, "Description: %s\n", v.Description)
-	fmt.Fprintf(outputWriter, "Status: %s\n", v.Status)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", v.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", v.Name)
+	_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", v.Description)
+	_, _ = fmt.Fprintf(outputWriter, "Status: %s\n", v.Status)
 	if v.StartDate != "" {
-		fmt.Fprintf(outputWriter, "Start: %s\n", v.StartDate)
+		_, _ = fmt.Fprintf(outputWriter, "Start: %s\n", v.StartDate)
 	}
 	if v.EndDate != "" {
-		fmt.Fprintf(outputWriter, "End: %s\n", v.EndDate)
+		_, _ = fmt.Fprintf(outputWriter, "End: %s\n", v.EndDate)
 	}
 	if v.CreatedAt != nil {
-		fmt.Fprintf(outputWriter, "Created: %s\n", v.CreatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", v.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
@@ -299,25 +299,25 @@ func outputVersion(v *openproject.Version) error {
 
 func outputGridList(list *openproject.GridList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tROWS\tCOLS\tWIDGETS")
+	_, _ = fmt.Fprintln(w, "ID\tROWS\tCOLS\tWIDGETS")
 	for _, g := range list.Embedded.Elements {
 		widgets := 0
 		if g.Embedded != nil {
 			widgets = len(g.Embedded.Widgets)
 		}
-		fmt.Fprintf(w, "%d\t%d\t%d\t%d\n", g.ID, g.RowCount, g.ColumnCount, widgets)
+		_, _ = fmt.Fprintf(w, "%d\t%d\t%d\t%d\n", g.ID, g.RowCount, g.ColumnCount, widgets)
 	}
 	return w.Flush()
 }
 
 func outputGrid(g *openproject.Grid) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", g.ID)
-	fmt.Fprintf(outputWriter, "Rows: %d\n", g.RowCount)
-	fmt.Fprintf(outputWriter, "Columns: %d\n", g.ColumnCount)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", g.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Rows: %d\n", g.RowCount)
+	_, _ = fmt.Fprintf(outputWriter, "Columns: %d\n", g.ColumnCount)
 	if g.Embedded != nil {
-		fmt.Fprintf(outputWriter, "Widgets:\n")
+		_, _ = fmt.Fprintf(outputWriter, "Widgets:\n")
 		for _, w := range g.Embedded.Widgets {
-			fmt.Fprintf(outputWriter, "  - ID: %d, Type: %s, Position: (%d,%d) to (%d,%d)\n",
+			_, _ = fmt.Fprintf(outputWriter, "  - ID: %d, Type: %s, Position: (%d,%d) to (%d,%d)\n",
 				w.ID, w.Identifier, w.StartRow, w.StartColumn, w.EndRow, w.EndColumn)
 		}
 	}
@@ -328,7 +328,7 @@ func outputGrid(g *openproject.Grid) error {
 
 func outputNotificationList(list *openproject.NotificationList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tREASON\tREAD\tCREATED")
+	_, _ = fmt.Fprintln(w, "ID\tREASON\tREAD\tCREATED")
 	for _, n := range list.Embedded.Elements {
 		read := "No"
 		if n.ReadIAN != nil && *n.ReadIAN {
@@ -338,28 +338,28 @@ func outputNotificationList(list *openproject.NotificationList) error {
 		if n.CreatedAt != nil {
 			created = n.CreatedAt.Format("2006-01-02 15:04")
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", n.ID, n.Reason, read, created)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", n.ID, n.Reason, read, created)
 	}
 	return w.Flush()
 }
 
 func outputNotification(n *openproject.Notification) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", n.ID)
-	fmt.Fprintf(outputWriter, "Reason: %s\n", n.Reason)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", n.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Reason: %s\n", n.Reason)
 	read := "No"
 	if n.ReadIAN != nil && *n.ReadIAN {
 		read = "Yes"
 	}
-	fmt.Fprintf(outputWriter, "Read: %s\n", read)
+	_, _ = fmt.Fprintf(outputWriter, "Read: %s\n", read)
 	if n.CreatedAt != nil {
-		fmt.Fprintf(outputWriter, "Created: %s\n", n.CreatedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", n.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	if n.Links != nil {
 		if n.Links.Actor != nil {
-			fmt.Fprintf(outputWriter, "Actor: %s\n", n.Links.Actor.Title)
+			_, _ = fmt.Fprintf(outputWriter, "Actor: %s\n", n.Links.Actor.Title)
 		}
 		if n.Links.Project != nil {
-			fmt.Fprintf(outputWriter, "Project: %s\n", n.Links.Project.Title)
+			_, _ = fmt.Fprintf(outputWriter, "Project: %s\n", n.Links.Project.Title)
 		}
 	}
 	return nil
@@ -369,7 +369,7 @@ func outputNotification(n *openproject.Notification) error {
 
 func outputRelationList(list *openproject.RelationList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tTYPE\tFROM\tTO\tDELAY")
+	_, _ = fmt.Fprintln(w, "ID\tTYPE\tFROM\tTO\tDELAY")
 	for _, r := range list.Embedded.Elements {
 		from := extractRelationFrom(r.Links)
 		to := extractRelationTo(r.Links)
@@ -377,21 +377,21 @@ func outputRelationList(list *openproject.RelationList) error {
 		if r.Delay > 0 {
 			delay = fmt.Sprintf("%d days", r.Delay)
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", r.ID, r.Type, from, to, delay)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", r.ID, r.Type, from, to, delay)
 	}
 	return w.Flush()
 }
 
 func outputRelation(r *openproject.Relation) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", r.ID)
-	fmt.Fprintf(outputWriter, "Type: %s\n", r.Type)
-	fmt.Fprintf(outputWriter, "From: %s\n", extractRelationFrom(r.Links))
-	fmt.Fprintf(outputWriter, "To: %s\n", extractRelationTo(r.Links))
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", r.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Type: %s\n", r.Type)
+	_, _ = fmt.Fprintf(outputWriter, "From: %s\n", extractRelationFrom(r.Links))
+	_, _ = fmt.Fprintf(outputWriter, "To: %s\n", extractRelationTo(r.Links))
 	if r.Description != "" {
-		fmt.Fprintf(outputWriter, "Description: %s\n", r.Description)
+		_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", r.Description)
 	}
 	if r.Delay > 0 {
-		fmt.Fprintf(outputWriter, "Delay: %d days\n", r.Delay)
+		_, _ = fmt.Fprintf(outputWriter, "Delay: %d days\n", r.Delay)
 	}
 	return nil
 }
@@ -400,22 +400,22 @@ func outputRelation(r *openproject.Relation) error {
 
 func outputStatusList(list *openproject.StatusList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tCLOSED\tREADONLY")
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tCLOSED\tREADONLY")
 	for _, s := range list.Embedded.Elements {
-		fmt.Fprintf(w, "%d\t%s\t%t\t%t\t%t\n", s.ID, s.Name, s.IsDefault, s.IsClosed, s.IsReadonly)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%t\t%t\t%t\n", s.ID, s.Name, s.IsDefault, s.IsClosed, s.IsReadonly)
 	}
 	return w.Flush()
 }
 
 func outputStatus(s *openproject.Status) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", s.ID)
-	fmt.Fprintf(outputWriter, "Name: %s\n", s.Name)
-	fmt.Fprintf(outputWriter, "Position: %d\n", s.Position)
-	fmt.Fprintf(outputWriter, "Default: %t\n", s.IsDefault)
-	fmt.Fprintf(outputWriter, "Closed: %t\n", s.IsClosed)
-	fmt.Fprintf(outputWriter, "Readonly: %t\n", s.IsReadonly)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", s.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", s.Name)
+	_, _ = fmt.Fprintf(outputWriter, "Position: %d\n", s.Position)
+	_, _ = fmt.Fprintf(outputWriter, "Default: %t\n", s.IsDefault)
+	_, _ = fmt.Fprintf(outputWriter, "Closed: %t\n", s.IsClosed)
+	_, _ = fmt.Fprintf(outputWriter, "Readonly: %t\n", s.IsReadonly)
 	if s.Color != "" {
-		fmt.Fprintf(outputWriter, "Color: %s\n", s.Color)
+		_, _ = fmt.Fprintf(outputWriter, "Color: %s\n", s.Color)
 	}
 	return nil
 }
@@ -424,21 +424,21 @@ func outputStatus(s *openproject.Status) error {
 
 func outputTypeList(list *openproject.TypeList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tMILESTONE")
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tMILESTONE")
 	for _, t := range list.Embedded.Elements {
-		fmt.Fprintf(w, "%d\t%s\t%t\t%t\n", t.ID, t.Name, t.IsDefault, t.IsMilestone)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%t\t%t\n", t.ID, t.Name, t.IsDefault, t.IsMilestone)
 	}
 	return w.Flush()
 }
 
 func outputType(t *openproject.Type) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", t.ID)
-	fmt.Fprintf(outputWriter, "Name: %s\n", t.Name)
-	fmt.Fprintf(outputWriter, "Position: %d\n", t.Position)
-	fmt.Fprintf(outputWriter, "Default: %t\n", t.IsDefault)
-	fmt.Fprintf(outputWriter, "Milestone: %t\n", t.IsMilestone)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", t.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", t.Name)
+	_, _ = fmt.Fprintf(outputWriter, "Position: %d\n", t.Position)
+	_, _ = fmt.Fprintf(outputWriter, "Default: %t\n", t.IsDefault)
+	_, _ = fmt.Fprintf(outputWriter, "Milestone: %t\n", t.IsMilestone)
 	if t.Color != "" {
-		fmt.Fprintf(outputWriter, "Color: %s\n", t.Color)
+		_, _ = fmt.Fprintf(outputWriter, "Color: %s\n", t.Color)
 	}
 	return nil
 }
@@ -447,20 +447,20 @@ func outputType(t *openproject.Type) error {
 
 func outputPriorityList(list *openproject.PriorityList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tNAME\tDEFAULT")
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT")
 	for _, p := range list.Embedded.Elements {
-		fmt.Fprintf(w, "%d\t%s\t%t\n", p.ID, p.Name, p.IsDefault)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%t\n", p.ID, p.Name, p.IsDefault)
 	}
 	return w.Flush()
 }
 
 func outputPriority(p *openproject.Priority) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", p.ID)
-	fmt.Fprintf(outputWriter, "Name: %s\n", p.Name)
-	fmt.Fprintf(outputWriter, "Position: %d\n", p.Position)
-	fmt.Fprintf(outputWriter, "Default: %t\n", p.IsDefault)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", p.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", p.Name)
+	_, _ = fmt.Fprintf(outputWriter, "Position: %d\n", p.Position)
+	_, _ = fmt.Fprintf(outputWriter, "Default: %t\n", p.IsDefault)
 	if p.Color != "" {
-		fmt.Fprintf(outputWriter, "Color: %s\n", p.Color)
+		_, _ = fmt.Fprintf(outputWriter, "Color: %s\n", p.Color)
 	}
 	return nil
 }
@@ -469,18 +469,18 @@ func outputPriority(p *openproject.Priority) error {
 
 func outputRoleList(list *openproject.RoleList) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tNAME")
+	_, _ = fmt.Fprintln(w, "ID\tNAME")
 	for _, r := range list.Embedded.Elements {
-		fmt.Fprintf(w, "%d\t%s\n", r.ID, r.Name)
+		_, _ = fmt.Fprintf(w, "%d\t%s\n", r.ID, r.Name)
 	}
 	return w.Flush()
 }
 
 func outputRole(r *openproject.Role) error {
-	fmt.Fprintf(outputWriter, "ID: %d\n", r.ID)
-	fmt.Fprintf(outputWriter, "Name: %s\n", r.Name)
+	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", r.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", r.Name)
 	if len(r.Permissions) > 0 {
-		fmt.Fprintf(outputWriter, "Permissions: %s\n", strings.Join(r.Permissions, ", "))
+		_, _ = fmt.Fprintf(outputWriter, "Permissions: %s\n", strings.Join(r.Permissions, ", "))
 	}
 	return nil
 }
@@ -489,9 +489,9 @@ func outputRole(r *openproject.Role) error {
 
 func outputSearchResults(results *openproject.SearchResults) error {
 	w := newTabWriter()
-	fmt.Fprintln(w, "ID\tTYPE\tTITLE")
+	_, _ = fmt.Fprintln(w, "ID\tTYPE\tTITLE")
 	for _, r := range results.Embedded.Elements {
-		fmt.Fprintf(w, "%d\t%s\t%s\n", r.ID, r.Type, r.Title)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\n", r.ID, r.Type, r.Title)
 	}
 	return w.Flush()
 }
@@ -599,3 +599,4 @@ func extractRelationTo(links *openproject.RelationLinks) string {
 	}
 	return links.To.Title
 }
+

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -26,8 +26,8 @@ var (
 
 // projectCmd represents the project command.
 var projectCmd = &cobra.Command{
-	Use:     "project",
-	Short:   "Manage OpenProject projects",
+	Use:   "project",
+	Short: "Manage OpenProject projects",
 	Long: `Manage OpenProject projects.
 
 Projects are the main organizational unit in OpenProject. Each project can contain
@@ -198,8 +198,8 @@ func init() {
 	projectCreateCmd.Flags().StringVarP(&projectCreateIdentifier, "identifier", "i", "", "Project identifier (required)")
 	projectCreateCmd.Flags().StringVarP(&projectCreateDescription, "description", "d", "", "Project description")
 	projectCreateCmd.Flags().BoolVarP(&projectCreatePublic, "public", "p", false, "Make project public")
-	projectCreateCmd.MarkFlagRequired("name")
-	projectCreateCmd.MarkFlagRequired("identifier")
+	_ = projectCreateCmd.MarkFlagRequired("name")
+	_ = projectCreateCmd.MarkFlagRequired("identifier")
 
 	// Update flags
 	projectUpdateCmd.Flags().StringVarP(&projectUpdateName, "name", "n", "", "Project name")

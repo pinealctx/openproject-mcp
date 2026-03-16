@@ -5,24 +5,24 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
-	timeEntryListProjectID    int
-	timeEntryListUserID       int
+	timeEntryListProjectID     int
+	timeEntryListUserID        int
 	timeEntryListWorkPackageID int
-	timeEntryListPageSize     int
-	timeEntryListSortBy       string
+	timeEntryListPageSize      int
+	timeEntryListSortBy        string
 
-	timeEntryCreateProjectID    int
+	timeEntryCreateProjectID     int
 	timeEntryCreateWorkPackageID int
-	timeEntryCreateActivityID   int
-	timeEntryCreateUserID       int
-	timeEntryCreateHours        string
-	timeEntryCreateComment      string
-	timeEntryCreateSpentOn      string
+	timeEntryCreateActivityID    int
+	timeEntryCreateUserID        int
+	timeEntryCreateHours         string
+	timeEntryCreateComment       string
+	timeEntryCreateSpentOn       string
 
 	timeEntryUpdateHours      string
 	timeEntryUpdateComment    string
@@ -32,8 +32,8 @@ var (
 
 // timeEntryCmd represents the time-entry command.
 var timeEntryCmd = &cobra.Command{
-	Use:     "time-entry",
-	Short:   "Manage time entries (work logs)",
+	Use:   "time-entry",
+	Short: "Manage time entries (work logs)",
 	Long: `Manage time entries for tracking work hours.
 
 Time entries record the amount of time spent on projects or specific work packages.
@@ -211,7 +211,7 @@ func init() {
 	timeEntryCreateCmd.Flags().StringVarP(&timeEntryCreateHours, "hours", "H", "", "Hours spent (e.g., 8.5 or PT8H30M) (required)")
 	timeEntryCreateCmd.Flags().StringVarP(&timeEntryCreateComment, "comment", "c", "", "Comment")
 	timeEntryCreateCmd.Flags().StringVarP(&timeEntryCreateSpentOn, "date", "d", "", "Date (YYYY-MM-DD, defaults to today)")
-	timeEntryCreateCmd.MarkFlagRequired("hours")
+	_ = timeEntryCreateCmd.MarkFlagRequired("hours")
 
 	// Update flags
 	timeEntryUpdateCmd.Flags().StringVarP(&timeEntryUpdateHours, "hours", "H", "", "Hours spent")
