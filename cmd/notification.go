@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -15,8 +15,8 @@ var (
 
 // notificationCmd represents the notification command.
 var notificationCmd = &cobra.Command{
-	Use:     "notification",
-	Short:   "Manage notifications",
+	Use:   "notification",
+	Short: "Manage notifications",
 	Long: `Manage OpenProject notifications.
 
 Notifications keep you informed about activity in OpenProject, including:
@@ -76,10 +76,10 @@ var notificationReadCmd = &cobra.Command{
 			return fmt.Errorf("invalid notification ID: %s", args[0])
 		}
 		if err := getClient().MarkNotificationRead(getContext(), id); err != nil {
-		 return err
-	 }
-        fmt.Println("Notification marked as read")
-        return nil
+			return err
+		}
+		fmt.Println("Notification marked as read")
+		return nil
 	},
 }
 
@@ -87,21 +87,21 @@ var notificationReadAllCmd = &cobra.Command{
 	Use:   "read-all",
 	Short: "Mark all notifications as read",
 	RunE: func(cmd *cobra.Command, args []string) error {
-        if err := getClient().MarkAllNotificationsRead(getContext()); err != nil {
-            return err
-        }
-        fmt.Println("All notifications marked as read")
-        return nil
-    },
+		if err := getClient().MarkAllNotificationsRead(getContext()); err != nil {
+			return err
+		}
+		fmt.Println("All notifications marked as read")
+		return nil
+	},
 }
 
 func init() {
-    rootCmd.AddCommand(notificationCmd)
-    notificationCmd.AddCommand(notificationListCmd)
-    notificationCmd.AddCommand(notificationReadCmd)
-    notificationCmd.AddCommand(notificationReadAllCmd)
+	rootCmd.AddCommand(notificationCmd)
+	notificationCmd.AddCommand(notificationListCmd)
+	notificationCmd.AddCommand(notificationReadCmd)
+	notificationCmd.AddCommand(notificationReadAllCmd)
 
-    // List flags
-    notificationListCmd.Flags().IntVarP(&notificationListPageSize, "page-size", "s", 20, "Number of results per page")
-    notificationListCmd.Flags().BoolVarP(&notificationListUnread, "unread", "u", false, "Show only unread notifications")
+	// List flags
+	notificationListCmd.Flags().IntVarP(&notificationListPageSize, "page-size", "s", 20, "Number of results per page")
+	notificationListCmd.Flags().BoolVarP(&notificationListUnread, "unread", "u", false, "Show only unread notifications")
 }

@@ -9,9 +9,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/config"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -134,7 +134,7 @@ func init() {
 }
 
 // setupLogging configures logging based on the configuration.
-func setupLogging(cfg *config.Config, cmd *cobra.Command) {
+func setupLogging(cfg *config.Config, _ *cobra.Command) {
 	// In CLI mode, suppress logs unless verbose
 	if !flagVerbose {
 		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))

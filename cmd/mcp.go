@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/config"
 	"github.com/pinealctx/openproject-mcp/pkg/server"
+	"github.com/spf13/cobra"
 )
 
 var (

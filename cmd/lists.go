@@ -36,8 +36,8 @@ Examples:
 
 // priorityCmd represents the priority command.
 var priorityCmd = &cobra.Command{
-	Use:     "priority",
-	Short:   "List work package priorities",
+	Use:   "priority",
+	Short: "List work package priorities",
 	Long: `List all available work package priorities.
 
 Priorities indicate the importance or urgency of a work package.
@@ -64,8 +64,8 @@ Examples:
 
 // typeCmd represents the type command.
 var typeCmd = &cobra.Command{
-	Use:     "type",
-	Short:   "List work package types",
+	Use:   "type",
+	Short: "List work package types",
 	Long: `List all available work package types.
 
 Types categorize work packages and determine their behavior and available attributes.
@@ -112,8 +112,8 @@ Examples:
 
 // roleCmd represents the role command.
 var roleCmd = &cobra.Command{
-	Use:     "role",
-	Short:   "List user roles",
+	Use:   "role",
+	Short: "List user roles",
 	Long: `List all available roles.
 
 Roles define what permissions a user has within a project. Each role contains

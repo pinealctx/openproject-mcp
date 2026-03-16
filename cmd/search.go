@@ -36,7 +36,7 @@ Examples:
 
   # Output as JSON for further processing
   openproject-mcp search "urgent" -o json`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := args[0]
 		results, err := getClient().Search(getContext(), query, searchType, searchLimit)

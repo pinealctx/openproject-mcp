@@ -39,7 +39,7 @@ func (c *Client) ListUsers(ctx context.Context, opts *ListUsersOptions) (*UserLi
 		params.Set("pageSize", strconv.Itoa(opts.PageSize))
 	}
 	if opts.SortBy != "" {
-		params.Set("sortBy", opts.SortBy)
+		params.Set("sortBy", normalizeSortBy(opts.SortBy))
 	}
 	if len(opts.Select) > 0 {
 		params.Set("select", strings.Join(opts.Select, ","))

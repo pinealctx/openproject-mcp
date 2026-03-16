@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/spf13/cobra"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -15,8 +15,8 @@ var (
 
 // userCmd represents the user command.
 var userCmd = &cobra.Command{
-	Use:     "user",
-	Short:   "Manage users",
+	Use:   "user",
+	Short: "Manage users",
 	Long: `Manage OpenProject users.
 
 Users are the people who interact with OpenProject. Each user has a profile,

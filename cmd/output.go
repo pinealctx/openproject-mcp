@@ -599,4 +599,3 @@ func extractRelationTo(links *openproject.RelationLinks) string {
 	}
 	return links.To.Title
 }
-
