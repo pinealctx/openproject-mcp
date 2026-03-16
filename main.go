@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -78,19 +79,18 @@ func main() {
 
 // setupLogging configures the logger based on the configuration.
 func setupLogging(cfg *config.Config) {
+	// In stdio mode stdout is used for the MCP protocol; discard all logs to
+	// prevent any output from interfering with the client.
+	if cfg.Transport == "stdio" {
+		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+		return
+	}
+
 	level, err := config.ParseLogLevel(cfg.LogLevel)
 	if err != nil {
 		level = 0
 	}
 
 	opts := &slog.HandlerOptions{Level: slog.Level(level)}
-
-	var handler slog.Handler
-	if cfg.Transport == "stdio" {
-		handler = slog.NewJSONHandler(os.Stderr, opts)
-	} else {
-		handler = slog.NewTextHandler(os.Stderr, opts)
-	}
-
-	slog.SetDefault(slog.New(handler))
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, opts)))
 }
