@@ -56,7 +56,7 @@ var notificationListCmd = &cobra.Command{
 			PageSize: notificationListPageSize,
 		}
 		if notificationListUnread {
-			opts.ReadIAN = "false"
+			opts.ReadIAN = "f" // OpenProject API uses "f"/"t" not "false"/"true"
 		}
 		list, err := getClient().ListNotifications(getContext(), opts)
 		if err != nil {

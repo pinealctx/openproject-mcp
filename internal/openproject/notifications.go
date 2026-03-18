@@ -3,6 +3,8 @@ package openproject
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -43,7 +45,7 @@ type NotificationList struct {
 
 // ListNotificationsOptions contains options for listing notifications.
 type ListNotificationsOptions struct {
-	// Filter by read status: "" = all, "true" = read, "false" = unread
+	// Filter by read status: "" = all, "f" = unread, "t" = read
 	ReadIAN  string
 	PageSize int
 	Offset   int
@@ -51,16 +53,22 @@ type ListNotificationsOptions struct {
 
 // ListNotifications returns the current user's notifications.
 func (c *Client) ListNotifications(ctx context.Context, opts *ListNotificationsOptions) (*NotificationList, error) {
-	path := "/notifications"
-	params := buildQuery(map[string]string{
-		"pageSize": intParam(opts.PageSize),
-		"offset":   intParam(opts.Offset),
-	})
-	if opts.ReadIAN != "" {
-		params += fmt.Sprintf(`&filters=[{"readIAN":{"operator":"=","values":[%q]}}]`, opts.ReadIAN)
+	params := url.Values{}
+	if opts.Offset > 0 {
+		params.Set("offset", strconv.Itoa(opts.Offset))
 	}
-	if params != "" {
-		path += "?" + params[1:] // strip leading "&"
+	if opts.PageSize > 0 {
+		params.Set("pageSize", strconv.Itoa(opts.PageSize))
+	}
+	if opts.ReadIAN != "" {
+		// OpenProject API expects "f" for false (unread), "t" for true (read)
+		filterJSON := fmt.Sprintf(`[{"readIAN":{"operator":"=","values":["%s"]}}]`, opts.ReadIAN)
+		params.Set("filters", filterJSON)
+	}
+
+	path := "/notifications"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
 	}
 
 	var list NotificationList
@@ -78,24 +86,4 @@ func (c *Client) MarkNotificationRead(ctx context.Context, id int) error {
 // MarkAllNotificationsRead marks all notifications as read.
 func (c *Client) MarkAllNotificationsRead(ctx context.Context) error {
 	return c.Post(ctx, "/notifications/read_ian", nil, nil)
-}
-
-// buildQuery is a small helper to build a query string from a string map,
-// skipping empty values. Returns "" or "&k=v&k=v..." (leading &, not ?).
-func buildQuery(params map[string]string) string {
-	result := ""
-	for k, v := range params {
-		if v != "" && v != "0" {
-			result += fmt.Sprintf("&%s=%s", k, v)
-		}
-	}
-	return result
-}
-
-// intParam converts an int to a string param, returning "" for zero.
-func intParam(v int) string {
-	if v == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%d", v)
 }

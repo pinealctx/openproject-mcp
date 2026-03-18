@@ -33,7 +33,7 @@ go build -o openproject-mcp .
 # Run in stdio mode (Claude Desktop / MCP clients)
 OPENPROJECT_URL=https://your-instance.openproject.com \
 OPENPROJECT_API_KEY=your-api-key \
-./openproject-mcp
+openproject-mcp
 ```
 
 ## Usage Modes
@@ -46,13 +46,13 @@ Starts an MCP server for AI assistants. No subcommand needed — just run the bi
 
 ```bash
 # stdio mode (default) - for Claude Desktop, Cursor, etc.
-./openproject-mcp
+openproject-mcp
 
 # SSE mode - for web-based MCP clients
-./openproject-mcp mcp -t sse -p 3000
+openproject-mcp mcp -t sse -p 3000
 
 # HTTP mode - for HTTP-based MCP clients
-./openproject-mcp mcp -t http -p 8080
+openproject-mcp mcp -t http -p 8080
 ```
 
 ### 2. CLI Mode
@@ -61,25 +61,25 @@ Direct command-line interaction with OpenProject API. Useful for scripting and a
 
 ```bash
 # List all projects
-./openproject-mcp project list
+openproject-mcp project list
 
 # Get project details
-./openproject-mcp project get 42
+openproject-mcp project get 42
 
 # Create a new project
-./openproject-mcp project create -n "My Project" -i "my-project"
+openproject-mcp project create -n "My Project" -i "my-project"
 
 # List work packages in a project
-./openproject-mcp wp list -p 42
+openproject-mcp wp list -p 42
 
 # Create a work package
-./openproject-mcp wp create -p 42 -s "Implement feature X"
+openproject-mcp wp create -p 42 -s "Implement feature X"
 
 # Search across OpenProject
-./openproject-mcp search "bug"
+openproject-mcp search "bug"
 
 # Output as JSON for scripting
-./openproject-mcp project list -o json
+openproject-mcp project list -o json
 ```
 
 ## CLI Commands
@@ -105,59 +105,59 @@ Direct command-line interaction with OpenProject API. Useful for scripting and a
 
 ```bash
 # === Projects ===
-./openproject-mcp project list
-./openproject-mcp project get 42
-./openproject-mcp project create -n "Website Redesign" -i "website-redesign"
-./openproject-mcp project update 42 -n "New Name"
-./openproject-mcp project delete 42
+openproject-mcp project list
+openproject-mcp project get 42
+openproject-mcp project create -n "Website Redesign" -i "website-redesign"
+openproject-mcp project update 42 -n "New Name"
+openproject-mcp project delete 42
 
 # === Work Packages ===
-./openproject-mcp wp list -p 42
-./openproject-mcp wp get 123
-./openproject-mcp wp create -p 42 -s "Fix login bug" -d "Description here"
-./openproject-mcp wp update 123 --status "In Progress" --progress 50
-./openproject-mcp wp update 123 --assignee 5
-./openproject-mcp wp delete 123
+openproject-mcp wp list -p 42
+openproject-mcp wp get 123
+openproject-mcp wp create -p 42 -s "Fix login bug" -d "Description here"
+openproject-mcp wp update 123 --status "In Progress" --progress 50
+openproject-mcp wp update 123 --assignee 5
+openproject-mcp wp delete 123
 
 # === Work Package Relations ===
-./openproject-mcp wp set-parent 123 -p 100
-./openproject-mcp wp relation create --from 123 --to 456 --type blocks
+openproject-mcp wp set-parent 123 -p 100
+openproject-mcp wp relation create --from 123 --to 456 --type blocks
 
 # === Users ===
-./openproject-mcp user list
-./openproject-mcp user get 5
-./openproject-mcp user me
+openproject-mcp user list
+openproject-mcp user get 5
+openproject-mcp user me
 
 # === Time Entries ===
-./openproject-mcp time-entry list -p 42
-./openproject-mcp time-entry create -H 4 -c "Worked on feature X"
-./openproject-mcp time-entry create -H 8 -w 123 -d 2024-01-15
+openproject-mcp time-entry list -p 42
+openproject-mcp time-entry create -H 4 -c "Worked on feature X"
+openproject-mcp time-entry create -H 8 -w 123 -d 2024-01-15
 
 # === Memberships ===
-./openproject-mcp membership list -p 42
-./openproject-mcp membership create -p 42 -u 5 -r "3,4"
-./openproject-mcp membership delete 123
+openproject-mcp membership list -p 42
+openproject-mcp membership create -p 42 -u 5 -r "3,4"
+openproject-mcp membership delete 123
 
 # === Search ===
-./openproject-mcp search "bug"
-./openproject-mcp search "website" -t project
-./openproject-mcp search "john" -t user
+openproject-mcp search "bug"
+openproject-mcp search "website" -t project
+openproject-mcp search "john" -t user
 
 # === Notifications ===
-./openproject-mcp notification list
-./openproject-mcp notification list -u      # unread only
-./openproject-mcp notification read-all
+openproject-mcp notification list
+openproject-mcp notification list -u      # unread only
+openproject-mcp notification read-all
 ```
 
-Run `./openproject-mcp [command] --help` for detailed usage of each command.
+Run `openproject-mcp [command] --help` for detailed usage of each command.
 
 ## Transport Modes
 
 | Mode | Command | Use Case |
 |------|---------|----------|
-| `stdio` | `./openproject-mcp` or `./openproject-mcp mcp -t stdio` | Claude Desktop, Cursor, Continue (default) |
-| `sse` | `./openproject-mcp mcp -t sse -p 3000` | Server-Sent Events for web-based MCP clients |
-| `http` | `./openproject-mcp mcp -t http -p 8080` | Streamable HTTP for web-based clients |
+| `stdio` | `openproject-mcp` or `openproject-mcp mcp -t stdio` | Claude Desktop, Cursor, Continue (default) |
+| `sse` | `openproject-mcp mcp -t sse -p 3000` | Server-Sent Events for web-based MCP clients |
+| `http` | `openproject-mcp mcp -t http -p 8080` | Streamable HTTP for web-based clients |
 
 ### stdio Mode (Default)
 
@@ -171,9 +171,9 @@ export OPENPROJECT_URL="https://your-instance.openproject.com"
 export OPENPROJECT_API_KEY="your-api-token"
 
 # Start MCP server (all three commands are equivalent)
-./openproject-mcp
-./openproject-mcp mcp
-./openproject-mcp mcp -t stdio
+openproject-mcp
+openproject-mcp mcp
+openproject-mcp mcp -t stdio
 ```
 
 ### SSE / HTTP Mode
@@ -182,10 +182,10 @@ For web-based MCP clients. Requires a port to listen on.
 
 ```bash
 # SSE mode
-./openproject-mcp mcp -t sse -p 3000
+openproject-mcp mcp -t sse -p 3000
 
 # HTTP mode
-./openproject-mcp mcp -t http -p 8080
+openproject-mcp mcp -t http -p 8080
 ```
 
 ## Credential Modes
@@ -197,7 +197,7 @@ Set credentials via environment variables at startup. All requests share the sam
 ```bash
 export OPENPROJECT_URL=https://your-instance.openproject.com
 export OPENPROJECT_API_KEY=your-api-key
-./openproject-mcp mcp -t http -p 8080
+openproject-mcp mcp -t http -p 8080
 ```
 
 > For `stdio` transport, credentials are **required** at startup.
@@ -207,7 +207,7 @@ export OPENPROJECT_API_KEY=your-api-key
 Start without credentials; each HTTP/SSE client supplies its own via request headers.
 
 ```bash
-./openproject-mcp mcp -t http -p 8080
+openproject-mcp mcp -t http -p 8080
 # no env vars needed
 ```
 

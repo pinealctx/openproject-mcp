@@ -52,7 +52,7 @@ func (r *Registry) listNotifications(ctx context.Context, req *mcp.CallToolReque
 		Offset:   args.Offset,
 	}
 	if args.Unread {
-		opts.ReadIAN = "false"
+		opts.ReadIAN = "f" // OpenProject API uses "f"/"t" not "false"/"true"
 	}
 
 	list, err := r.client.ListNotifications(ctx, opts)
