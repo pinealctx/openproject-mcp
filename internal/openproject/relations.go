@@ -2,12 +2,21 @@ package openproject
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
 // SetWorkPackageParent sets the parent of a work package.
+// It automatically fetches the current lockVersion to satisfy OpenProject's optimistic concurrency check.
 func (c *Client) SetWorkPackageParent(ctx context.Context, workPackageID, parentID int) (*WorkPackage, error) {
+	// Fetch current work package to get lockVersion
+	current, err := c.GetWorkPackage(ctx, workPackageID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch current work package for lockVersion: %w", err)
+	}
+
 	payload := map[string]interface{}{
+		"lockVersion": current.LockVersion,
 		"_links": map[string]interface{}{
 			"parent": map[string]string{
 				"href": fmt.Sprintf("/api/v3/work_packages/%d", parentID),
@@ -23,10 +32,18 @@ func (c *Client) SetWorkPackageParent(ctx context.Context, workPackageID, parent
 }
 
 // RemoveWorkPackageParent removes the parent of a work package.
+// It automatically fetches the current lockVersion to satisfy OpenProject's optimistic concurrency check.
 func (c *Client) RemoveWorkPackageParent(ctx context.Context, workPackageID int) (*WorkPackage, error) {
+	// Fetch current work package to get lockVersion
+	current, err := c.GetWorkPackage(ctx, workPackageID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch current work package for lockVersion: %w", err)
+	}
+
 	payload := map[string]interface{}{
+		"lockVersion": current.LockVersion,
 		"_links": map[string]interface{}{
-			"parent": nil,
+			"parent": map[string]interface{}{"href": nil},
 		},
 	}
 
@@ -38,12 +55,48 @@ func (c *Client) RemoveWorkPackageParent(ctx context.Context, workPackageID int)
 }
 
 // ListWorkPackageChildren retrieves the children of a work package.
+// It fetches the parent work package and parses its _links.children to get child IDs,
+// then fetches each child work package individually.
 func (c *Client) ListWorkPackageChildren(ctx context.Context, workPackageID int) (*WorkPackageList, error) {
-	var result WorkPackageList
-	if err := c.Get(ctx, fmt.Sprintf("/work_packages/%d/children", workPackageID), &result); err != nil {
-		return nil, err
+	// Get the parent work package to access its _links.children
+	parent, err := c.GetWorkPackage(ctx, workPackageID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch work package: %w", err)
 	}
-	return &result, nil
+
+	result := &WorkPackageList{}
+
+	// Check if there are children links
+	if parent.Links == nil || len(parent.Links.Children) == 0 {
+		return result, nil
+	}
+
+	// Parse children links - they're stored as json.RawMessage
+	var childLinks []struct {
+		Href string `json:"href"`
+	}
+	if err := json.Unmarshal(parent.Links.Children, &childLinks); err != nil {
+		return nil, fmt.Errorf("failed to parse children links: %w", err)
+	}
+
+	// Fetch each child work package
+	for _, link := range childLinks {
+		// Extract ID from href like "/api/v3/work_packages/123"
+		var childID int
+		if _, err := fmt.Sscanf(link.Href, "/api/v3/work_packages/%d", &childID); err != nil {
+			continue // Skip malformed links
+		}
+
+		child, err := c.GetWorkPackage(ctx, childID)
+		if err != nil {
+			continue // Skip if child can't be fetched
+		}
+		result.Embedded.Elements = append(result.Embedded.Elements, *child)
+	}
+
+	result.Count = len(result.Embedded.Elements)
+	result.Total = result.Count
+	return result, nil
 }
 
 // CreateRelationOptions contains options for creating a relation.
