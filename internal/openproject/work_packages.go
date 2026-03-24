@@ -246,6 +246,16 @@ func (c *Client) ListPriorities(ctx context.Context) (*PriorityList, error) {
 	return &result, nil
 }
 
+// ListAvailableAssignees retrieves users who can be assigned to a work package.
+func (c *Client) ListAvailableAssignees(ctx context.Context, workPackageID int) (*UserList, error) {
+	var result UserList
+	path := fmt.Sprintf("/work_packages/%d/available_assignees", workPackageID)
+	if err := c.Get(ctx, path, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // jsonMarshalFilters marshals filters to JSON string.
 func jsonMarshalFilters(filters []WorkPackageFilter) (string, error) {
 	encoded := make([]map[string]map[string]interface{}, 0, len(filters))

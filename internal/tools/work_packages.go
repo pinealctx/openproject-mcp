@@ -58,6 +58,10 @@ type ListTypesArgs struct {
 type ListStatusesArgs struct{}
 type ListPrioritiesArgs struct{}
 
+type ListAvailableAssigneesArgs struct {
+	WorkPackageID int `json:"workPackageId"`
+}
+
 // registerWorkPackageTools registers work package-related tools.
 func (r *Registry) registerWorkPackageTools(server *mcp.Server) {
 	addTool(server, "list_work_packages", "List work packages, optionally filtered by project",
@@ -123,6 +127,12 @@ func (r *Registry) registerWorkPackageTools(server *mcp.Server) {
 
 	addTool(server, "list_priorities", "List all work package priorities",
 		noSchema, r.listPriorities)
+
+	addTool(server, "list_available_assignees", "List users who can be assigned to a work package",
+		newSchema(schemaProps{
+			"workPackageId": schemaInt("Work package ID"),
+		}, "workPackageId"),
+		r.listAvailableAssignees)
 }
 
 func (r *Registry) listWorkPackages(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -346,6 +356,24 @@ func (r *Registry) listPriorities(ctx context.Context, req *mcp.CallToolRequest)
 	result := fmt.Sprintf("Found %d priorities:\n\n", list.Total)
 	for _, p := range list.Embedded.Elements {
 		result += fmt.Sprintf("- **%s** (ID: %d)\n", p.Name, p.ID)
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+}
+
+func (r *Registry) listAvailableAssignees(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var args ListAvailableAssigneesArgs
+	if err := parseArgs(req.Params.Arguments, &args); err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+	}
+
+	list, err := r.client.ListAvailableAssignees(ctx, args.WorkPackageID)
+	if err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list available assignees: %v", err)}}}, nil
+	}
+
+	result := fmt.Sprintf("Found %d available assignees for work package #%d:\n\n", list.Total, args.WorkPackageID)
+	for _, u := range list.Embedded.Elements {
+		result += fmt.Sprintf("- **%s** (ID: %d, Email: %s)\n", u.Name, u.ID, u.Email)
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
 }
