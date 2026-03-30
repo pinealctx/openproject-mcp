@@ -142,8 +142,17 @@ func (c *Client) DeleteMembership(ctx context.Context, id int) error {
 
 // ListProjectMemberships retrieves memberships for a project.
 func (c *Client) ListProjectMemberships(ctx context.Context, projectID int) (*MembershipList, error) {
+	filters := []MembershipFilter{
+		{Name: "project", Values: []string{fmt.Sprintf("%d", projectID)}},
+	}
+	filterJSON, err := jsonMarshalMembershipFilters(filters)
+	if err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("/memberships?filters=%s", url.QueryEscape(filterJSON))
 	var result MembershipList
-	if err := c.Get(ctx, fmt.Sprintf("/projects/%d/memberships", projectID), &result); err != nil {
+	if err := c.Get(ctx, path, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

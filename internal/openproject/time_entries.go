@@ -97,7 +97,7 @@ func (c *Client) CreateTimeEntry(ctx context.Context, opts *CreateTimeEntryOptio
 	}
 	if opts.ActivityID > 0 {
 		links["activity"] = map[string]string{
-			"href": fmt.Sprintf("/api/v3/time_entry_activities/%d", opts.ActivityID),
+			"href": fmt.Sprintf("/api/v3/time_entries/activities/%d", opts.ActivityID),
 		}
 	}
 	if opts.UserID > 0 {
@@ -137,7 +137,7 @@ func (c *Client) UpdateTimeEntry(ctx context.Context, id int, opts *UpdateTimeEn
 	if opts.ActivityID > 0 {
 		payload["_links"] = map[string]interface{}{
 			"activity": map[string]string{
-				"href": fmt.Sprintf("/api/v3/time_entry_activities/%d", opts.ActivityID),
+				"href": fmt.Sprintf("/api/v3/time_entries/activities/%d", opts.ActivityID),
 			},
 		}
 	}
@@ -157,7 +157,7 @@ func (c *Client) DeleteTimeEntry(ctx context.Context, id int) error {
 // ListTimeEntryActivities retrieves all time entry activities.
 func (c *Client) ListTimeEntryActivities(ctx context.Context) (*TimeEntryActivityList, error) {
 	var result TimeEntryActivityList
-	if err := c.Get(ctx, "/time_entry_activities", &result); err != nil {
+	if err := c.Get(ctx, "/time_entries/activities", &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
