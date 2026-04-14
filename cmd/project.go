@@ -87,7 +87,7 @@ Examples:
   openproject-mcp project list -o json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		api := getClient().APIClient()
-		params := &openproject.ListProjectsParams{}
+		params := &external.ListProjectsParams{}
 		if projectListSortBy != "" {
 			params.SortBy = ptr(normalizeSortBy(projectListSortBy))
 		}
@@ -99,7 +99,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		var result openproject.ProjectCollectionModel
+		var result external.ProjectCollectionModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -121,7 +121,7 @@ var projectGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.ProjectModel
+		var result external.ProjectModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ var projectCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.ProjectModel
+		var result external.ProjectModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -185,7 +185,7 @@ var projectUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.ProjectModel
+		var result external.ProjectModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}

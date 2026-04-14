@@ -38,7 +38,7 @@ var versionListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.VersionCollectionModel
+		var result external.VersionCollectionModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -75,7 +75,7 @@ var versionCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.VersionReadModel
+		var result external.VersionReadModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}

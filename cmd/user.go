@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +51,7 @@ var userListCmd = &cobra.Command{
 	Short: "List all users",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		api := getClient().APIClient()
-		params := &openproject.ListUsersParams{}
+		params := &external.ListUsersParams{}
 		if userListPageSize > 0 {
 			params.PageSize = ptr(userListPageSize)
 		}
@@ -62,7 +63,7 @@ var userListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.UserCollectionModel
+		var result external.UserCollectionModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -85,7 +86,7 @@ var userGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.UserModel
+		var result external.UserModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}

@@ -144,11 +144,6 @@ func (c *Client) Get(ctx context.Context, path string, result any) error {
 	return c.doRequest(ctx, http.MethodGet, path, nil, result)
 }
 
-// Post performs a raw POST request to /api/v3/{path}.
-func (c *Client) Post(ctx context.Context, path string, body any, result any) error {
-	return c.doRequest(ctx, http.MethodPost, path, body, result)
-}
-
 // Patch performs a raw PATCH request to /api/v3/{path}.
 func (c *Client) Patch(ctx context.Context, path string, body any, result any) error {
 	return c.doRequest(ctx, http.MethodPatch, path, body, result)

@@ -133,10 +133,10 @@ Examples:
   openproject-mcp wp list -o json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		api := getClient().APIClient()
-		var result openproject.WorkPackagesModel
+		var result external.WorkPackagesModel
 
 		if wpListProjectID > 0 {
-			params := &openproject.GetProjectWorkPackageCollectionParams{}
+			params := &external.GetProjectWorkPackageCollectionParams{}
 			if wpListPageSize > 0 {
 				params.PageSize = ptr(wpListPageSize)
 			}
@@ -154,7 +154,7 @@ Examples:
 				return err
 			}
 		} else {
-			params := &openproject.ListWorkPackagesParams{}
+			params := &external.ListWorkPackagesParams{}
 			if wpListPageSize > 0 {
 				params.PageSize = ptr(wpListPageSize)
 			}
@@ -190,7 +190,7 @@ var wpGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.WorkPackageModel
+		var result external.WorkPackageModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -238,7 +238,7 @@ var wpCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.WorkPackageModel
+		var result external.WorkPackageModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -302,7 +302,7 @@ var wpUpdateCmd = &cobra.Command{
 			body["_links"] = links
 		}
 
-		var result openproject.WorkPackageModel
+		var result external.WorkPackageModel
 		if err := getClient().Patch(getContext(), fmt.Sprintf("/work_packages/%d", id), body, &result); err != nil {
 			return err
 		}
@@ -341,7 +341,7 @@ var wpChildrenCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
-		var result openproject.WorkPackagesModel
+		var result external.WorkPackagesModel
 		if err := getClient().Get(getContext(), fmt.Sprintf("/work_packages/%d/children", id), &result); err != nil {
 			return err
 		}
@@ -367,7 +367,7 @@ var wpSetParentCmd = &cobra.Command{
 				},
 			},
 		}
-		var result openproject.WorkPackageModel
+		var result external.WorkPackageModel
 		if err := getClient().Patch(getContext(), fmt.Sprintf("/work_packages/%d", id), body, &result); err != nil {
 			return err
 		}
@@ -390,7 +390,7 @@ var wpRemoveParentCmd = &cobra.Command{
 				"parent": nil,
 			},
 		}
-		var result openproject.WorkPackageModel
+		var result external.WorkPackageModel
 		if err := getClient().Patch(getContext(), fmt.Sprintf("/work_packages/%d", id), body, &result); err != nil {
 			return err
 		}
@@ -414,14 +414,14 @@ var wpRelationListCmd = &cobra.Command{
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
 		api := getClient().APIClient()
-		params := &openproject.ListRelationsParams{
+		params := &external.ListRelationsParams{
 			Filters: ptr(fmt.Sprintf(`[{"from":{"operator":"=","values":["%d"]}}]`, id)),
 		}
 		resp, err := api.ListRelations(getContext(), params)
 		if err != nil {
 			return err
 		}
-		var result openproject.RelationCollectionModel
+		var result external.RelationCollectionModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -450,7 +450,7 @@ var wpRelationCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.RelationReadModel
+		var result external.RelationReadModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -472,7 +472,7 @@ var wpRelationGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.RelationReadModel
+		var result external.RelationReadModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}

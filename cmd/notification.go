@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +54,7 @@ var notificationListCmd = &cobra.Command{
 	Short: "List notifications",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		api := getClient().APIClient()
-		params := &openproject.ListNotificationsParams{}
+		params := &external.ListNotificationsParams{}
 		if notificationListPageSize > 0 {
 			params.PageSize = ptr(notificationListPageSize)
 		}
@@ -65,7 +66,7 @@ var notificationListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.NotificationCollectionModel
+		var result external.NotificationCollectionModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}

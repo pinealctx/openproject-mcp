@@ -66,7 +66,7 @@ var membershipListCmd = &cobra.Command{
 	Short: "List memberships",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		api := getClient().APIClient()
-		params := &openproject.ListMembershipsParams{}
+		params := &external.ListMembershipsParams{}
 
 		if membershipListProjectID > 0 {
 			filter := fmt.Sprintf(`[{"project":{"operator":"=","values":["%d"]}}]`, membershipListProjectID)
@@ -77,7 +77,7 @@ var membershipListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.MembershipCollectionModel
+		var result external.MembershipCollectionModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ var membershipGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.MembershipReadModel
+		var result external.MembershipReadModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ var membershipCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.MembershipReadModel
+		var result external.MembershipReadModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ var membershipUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var result openproject.MembershipReadModel
+		var result external.MembershipReadModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +33,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		var result openproject.StatusCollectionModel
+		var result external.StatusCollectionModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -65,7 +66,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		var result openproject.PriorityCollectionModel
+		var result external.PriorityCollectionModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -114,7 +115,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			var result openproject.TypesByWorkspaceModel
+			var result external.TypesByWorkspaceModel
 			if err := openproject.ReadResponse(resp, &result); err != nil {
 				return err
 			}
@@ -125,7 +126,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		var result openproject.TypesByWorkspaceModel
+		var result external.TypesByWorkspaceModel
 		if err := openproject.ReadResponse(resp, &result); err != nil {
 			return err
 		}
@@ -165,7 +166,7 @@ Examples:
 		}
 		var collection struct {
 			UnderscoreEmbedded struct {
-				Elements []openproject.RoleModel `json:"elements"`
+				Elements []external.RoleModel `json:"elements"`
 			} `json:"_embedded"`
 		}
 		if err := openproject.ReadResponse(resp, &collection); err != nil {

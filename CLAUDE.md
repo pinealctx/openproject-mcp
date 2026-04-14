@@ -22,7 +22,6 @@ internal/
     config.go           Config struct, Load(), Validate()
   openproject/          Adapter wrapping the external API client
     client.go           Client struct, NewClient(), NewClientDirect(), APIClient()
-    types.go            Type aliases re-exporting external module types
   tools/                MCP tool handlers (one file per group)
     tools.go            Registry, tool mode selection, schema helpers
     helpers.go          Shared helpers (parseArgs, formatUser, etc.)
@@ -31,18 +30,15 @@ internal/
     work_packages.go    list/get/create/update/delete_work_package + types/statuses/priorities
     users.go            list_users, get_user
     memberships.go      list/get/create/update/delete_membership + list_project_members, list_roles, get_role
-    time_entries.go     list/create/update/delete_time_entry + list_time_entry_activities
     versions.go         list/create/update/delete_version
     relations.go        parent/child ops + relation CRUD
     search.go           search
-    boards.go           board CRUD + widget management
     notifications.go    list/read notifications
     comments.go         list activities, create comment
     watchers.go         list/add/remove watchers
     groups.go           group CRUD
     documents.go        list/get/update documents
     queries.go          list/get queries
-    wiki.go             list/get/update wiki pages
     placeholders.go     placeholder user CRUD
     configurations.go   view configuration
 
@@ -80,7 +76,7 @@ Three modes control which MCP tools are registered:
 | `custom` | user-selected | `TOOL_MODE=custom ENABLED_TOOLS=list_projects,get_project` |
 
 Default groups: connection, project, work_package, user, version, search
-Full-only groups: membership, time_entry, relation, board, notification, comment, watcher, group, document, query, wiki, placeholder, configuration
+Full-only groups: membership, relation, notification, comment, watcher, group, document, query, placeholder, configuration
 
 ## Transports
 

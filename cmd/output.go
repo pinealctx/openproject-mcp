@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 var outputWriter io.Writer = os.Stdout
@@ -28,53 +28,45 @@ func outputJSON(data interface{}) error {
 
 func outputText(data interface{}) error {
 	switch v := data.(type) {
-	case *openproject.ProjectCollectionModel:
+	case *external.ProjectCollectionModel:
 		return outputProjectList(v)
-	case *openproject.ProjectModel:
+	case *external.ProjectModel:
 		return outputProject(v)
-	case *openproject.WorkPackagesModel:
+	case *external.WorkPackagesModel:
 		return outputWorkPackageList(v)
-	case *openproject.WorkPackageModel:
+	case *external.WorkPackageModel:
 		return outputWorkPackage(v)
-	case *openproject.UserCollectionModel:
+	case *external.UserCollectionModel:
 		return outputUserList(v)
-	case *openproject.UserModel:
+	case *external.UserModel:
 		return outputUser(v)
-	case *openproject.MembershipCollectionModel:
+	case *external.MembershipCollectionModel:
 		return outputMembershipList(v)
-	case *openproject.MembershipReadModel:
+	case *external.MembershipReadModel:
 		return outputMembership(v)
-	case *openproject.TimeEntryCollectionModel:
-		return outputTimeEntryList(v)
-	case *openproject.TimeEntryModel:
-		return outputTimeEntry(v)
-	case *openproject.VersionCollectionModel:
+	case *external.VersionCollectionModel:
 		return outputVersionList(v)
-	case *openproject.VersionReadModel:
+	case *external.VersionReadModel:
 		return outputVersion(v)
-	case *openproject.GridCollectionModel:
-		return outputGridList(v)
-	case *openproject.GridReadModel:
-		return outputGrid(v)
-	case *openproject.NotificationCollectionModel:
+	case *external.NotificationCollectionModel:
 		return outputNotificationList(v)
-	case *openproject.NotificationModel:
+	case *external.NotificationModel:
 		return outputNotification(v)
-	case *openproject.RelationCollectionModel:
+	case *external.RelationCollectionModel:
 		return outputRelationList(v)
-	case *openproject.RelationReadModel:
+	case *external.RelationReadModel:
 		return outputRelation(v)
-	case *openproject.StatusCollectionModel:
+	case *external.StatusCollectionModel:
 		return outputStatusList(v)
-	case *openproject.StatusModel:
+	case *external.StatusModel:
 		return outputStatus(v)
-	case *openproject.TypesByWorkspaceModel:
+	case *external.TypesByWorkspaceModel:
 		return outputTypeList(v)
-	case *openproject.TypeModel:
+	case *external.TypeModel:
 		return outputType(v)
-	case *openproject.PriorityCollectionModel:
+	case *external.PriorityCollectionModel:
 		return outputPriorityList(v)
-	case *openproject.PriorityModel:
+	case *external.PriorityModel:
 		return outputPriority(v)
 	default:
 		return outputJSON(data)
@@ -108,7 +100,7 @@ func dBool(b *bool) bool {
 
 // --- Project output ---
 
-func outputProjectList(list *openproject.ProjectCollectionModel) error {
+func outputProjectList(list *external.ProjectCollectionModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tIDENTIFIER\tNAME\tACTIVE\tPUBLIC")
 	for _, p := range list.UnderscoreEmbedded.Elements {
@@ -117,7 +109,7 @@ func outputProjectList(list *openproject.ProjectCollectionModel) error {
 	return w.Flush()
 }
 
-func outputProject(p *openproject.ProjectModel) error {
+func outputProject(p *external.ProjectModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", dInt(p.Id))
 	_, _ = fmt.Fprintf(outputWriter, "Identifier: %s\n", dStr(p.Identifier))
 	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", dStr(p.Name))
@@ -137,7 +129,7 @@ func outputProject(p *openproject.ProjectModel) error {
 
 // --- Work Package output ---
 
-func outputWorkPackageList(list *openproject.WorkPackagesModel) error {
+func outputWorkPackageList(list *external.WorkPackagesModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tSUBJECT\tTYPE\tSTATUS\tASSIGNEE")
 	for _, wp := range list.UnderscoreEmbedded.Elements {
@@ -152,7 +144,7 @@ func outputWorkPackageList(list *openproject.WorkPackagesModel) error {
 	return w.Flush()
 }
 
-func outputWorkPackage(wp *openproject.WorkPackageModel) error {
+func outputWorkPackage(wp *external.WorkPackageModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", dInt(wp.Id))
 	_, _ = fmt.Fprintf(outputWriter, "Subject: %s\n", wp.Subject)
 	if wp.Description != nil && wp.Description.Raw != nil {
@@ -184,7 +176,7 @@ func outputWorkPackage(wp *openproject.WorkPackageModel) error {
 
 // --- User output ---
 
-func outputUserList(list *openproject.UserCollectionModel) error {
+func outputUserList(list *external.UserCollectionModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tNAME\tEMAIL\tSTATUS")
 	for _, u := range list.UnderscoreEmbedded.Elements {
@@ -193,7 +185,7 @@ func outputUserList(list *openproject.UserCollectionModel) error {
 	return w.Flush()
 }
 
-func outputUser(u *openproject.UserModel) error {
+func outputUser(u *external.UserModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", u.Id)
 	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", u.Name)
 	if u.Login != nil {
@@ -219,7 +211,7 @@ func outputUser(u *openproject.UserModel) error {
 
 // --- Membership output ---
 
-func outputMembershipList(list *openproject.MembershipCollectionModel) error {
+func outputMembershipList(list *external.MembershipCollectionModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tROLES")
 	for _, m := range list.UnderscoreEmbedded.Elements {
@@ -236,7 +228,7 @@ func outputMembershipList(list *openproject.MembershipCollectionModel) error {
 	return w.Flush()
 }
 
-func outputMembership(m *openproject.MembershipReadModel) error {
+func outputMembership(m *external.MembershipReadModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", m.Id)
 	roles := "-"
 	if len(m.UnderscoreLinks.Roles) > 0 {
@@ -251,49 +243,9 @@ func outputMembership(m *openproject.MembershipReadModel) error {
 	return nil
 }
 
-// --- Time Entry output ---
-
-func outputTimeEntryList(list *openproject.TimeEntryCollectionModel) error {
-	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tDATE\tHOURS\tCOMMENT")
-	for _, t := range list.UnderscoreEmbedded.Elements {
-		comment := ""
-		if t.Comment != nil && t.Comment.Raw != nil {
-			comment = truncate(*t.Comment.Raw, 30)
-		}
-		spentOn := "-"
-		if t.SpentOn != nil {
-			spentOn = t.SpentOn.String()
-		}
-		hours := "-"
-		if t.Hours != nil {
-			hours = *t.Hours
-		}
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", dInt(t.Id), spentOn, hours, comment)
-	}
-	return w.Flush()
-}
-
-func outputTimeEntry(t *openproject.TimeEntryModel) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", dInt(t.Id))
-	if t.SpentOn != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Date: %s\n", t.SpentOn.String())
-	}
-	if t.Hours != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Hours: %s\n", *t.Hours)
-	}
-	if t.Comment != nil && t.Comment.Raw != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Comment: %s\n", *t.Comment.Raw)
-	}
-	if t.CreatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", t.CreatedAt.Format("2006-01-02 15:04:05"))
-	}
-	return nil
-}
-
 // --- Version output ---
 
-func outputVersionList(list *openproject.VersionCollectionModel) error {
+func outputVersionList(list *external.VersionCollectionModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tNAME\tSTATUS\tSTART\tEND")
 	for _, v := range list.UnderscoreEmbedded.Elements {
@@ -310,7 +262,7 @@ func outputVersionList(list *openproject.VersionCollectionModel) error {
 	return w.Flush()
 }
 
-func outputVersion(v *openproject.VersionReadModel) error {
+func outputVersion(v *external.VersionReadModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", v.Id)
 	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", v.Name)
 	_, _ = fmt.Fprintf(outputWriter, "Status: %s\n", v.Status)
@@ -324,34 +276,9 @@ func outputVersion(v *openproject.VersionReadModel) error {
 	return nil
 }
 
-// --- Grid/Board output ---
-
-func outputGridList(list *openproject.GridCollectionModel) error {
-	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tROWS\tCOLS\tWIDGETS")
-	for _, g := range list.UnderscoreEmbedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%d\t%d\t%d\n", g.Id, g.RowCount, g.ColumnCount, len(g.Widgets))
-	}
-	return w.Flush()
-}
-
-func outputGrid(g *openproject.GridReadModel) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", g.Id)
-	_, _ = fmt.Fprintf(outputWriter, "Rows: %d\n", g.RowCount)
-	_, _ = fmt.Fprintf(outputWriter, "Columns: %d\n", g.ColumnCount)
-	if len(g.Widgets) > 0 {
-		_, _ = fmt.Fprintf(outputWriter, "Widgets:\n")
-		for _, w := range g.Widgets {
-			_, _ = fmt.Fprintf(outputWriter, "  - ID: %d, Type: %s, Position: (%d,%d) to (%d,%d)\n",
-				dInt(w.Id), w.Identifier, w.StartRow, w.StartColumn, w.EndRow, w.EndColumn)
-		}
-	}
-	return nil
-}
-
 // --- Notification output ---
 
-func outputNotificationList(list *openproject.NotificationCollectionModel) error {
+func outputNotificationList(list *external.NotificationCollectionModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tREASON\tREAD\tCREATED")
 	for _, n := range list.UnderscoreEmbedded.Elements {
@@ -376,7 +303,7 @@ func outputNotificationList(list *openproject.NotificationCollectionModel) error
 	return w.Flush()
 }
 
-func outputNotification(n *openproject.NotificationModel) error {
+func outputNotification(n *external.NotificationModel) error {
 	if n.Id != nil {
 		_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", *n.Id)
 	}
@@ -396,7 +323,7 @@ func outputNotification(n *openproject.NotificationModel) error {
 
 // --- Relation output ---
 
-func outputRelationList(list *openproject.RelationCollectionModel) error {
+func outputRelationList(list *external.RelationCollectionModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tTYPE\tDELAY")
 	for _, r := range list.UnderscoreEmbedded.Elements {
@@ -413,7 +340,7 @@ func outputRelationList(list *openproject.RelationCollectionModel) error {
 	return w.Flush()
 }
 
-func outputRelation(r *openproject.RelationReadModel) error {
+func outputRelation(r *external.RelationReadModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", dInt(r.Id))
 	if r.Type != nil {
 		_, _ = fmt.Fprintf(outputWriter, "Type: %s\n", *r.Type)
@@ -429,7 +356,7 @@ func outputRelation(r *openproject.RelationReadModel) error {
 
 // --- Status output ---
 
-func outputStatusList(list *openproject.StatusCollectionModel) error {
+func outputStatusList(list *external.StatusCollectionModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tCLOSED\tREADONLY")
 	for _, s := range list.UnderscoreEmbedded.Elements {
@@ -438,7 +365,7 @@ func outputStatusList(list *openproject.StatusCollectionModel) error {
 	return w.Flush()
 }
 
-func outputStatus(s *openproject.StatusModel) error {
+func outputStatus(s *external.StatusModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", dInt(s.Id))
 	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", dStr(s.Name))
 	if s.Position != nil {
@@ -455,7 +382,7 @@ func outputStatus(s *openproject.StatusModel) error {
 
 // --- Type output ---
 
-func outputTypeList(list *openproject.TypesByWorkspaceModel) error {
+func outputTypeList(list *external.TypesByWorkspaceModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tMILESTONE")
 	if list.UnderscoreEmbedded.Elements != nil {
@@ -466,7 +393,7 @@ func outputTypeList(list *openproject.TypesByWorkspaceModel) error {
 	return w.Flush()
 }
 
-func outputType(t *openproject.TypeModel) error {
+func outputType(t *external.TypeModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", dInt(t.Id))
 	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", dStr(t.Name))
 	if t.Position != nil {
@@ -482,7 +409,7 @@ func outputType(t *openproject.TypeModel) error {
 
 // --- Priority output ---
 
-func outputPriorityList(list *openproject.PriorityCollectionModel) error {
+func outputPriorityList(list *external.PriorityCollectionModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT")
 	for _, p := range list.UnderscoreEmbedded.Elements {
@@ -491,7 +418,7 @@ func outputPriorityList(list *openproject.PriorityCollectionModel) error {
 	return w.Flush()
 }
 
-func outputPriority(p *openproject.PriorityModel) error {
+func outputPriority(p *external.PriorityModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", dInt(p.Id))
 	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", dStr(p.Name))
 	if p.Position != nil {
@@ -503,7 +430,7 @@ func outputPriority(p *openproject.PriorityModel) error {
 
 // --- Role output ---
 
-func outputRoleList(roles []openproject.RoleModel) error {
+func outputRoleList(roles []external.RoleModel) error {
 	w := newTabWriter()
 	_, _ = fmt.Fprintln(w, "ID\tNAME")
 	for _, r := range roles {

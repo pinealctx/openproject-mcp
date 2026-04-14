@@ -35,20 +35,12 @@ var toolGroups = map[string]ToolGroup{
 		"update_membership", "delete_membership", "list_project_members",
 		"list_roles", "get_role",
 	}},
-	"time_entry": {IsDefault: false, Tools: []string{
-		"list_time_entries", "create_time_entry", "update_time_entry",
-		"delete_time_entry", "list_time_entry_activities",
-	}},
 	"relation": {IsDefault: false, Tools: []string{
 		"set_work_package_parent", "remove_work_package_parent",
 		"list_work_package_children",
 		"create_work_package_relation", "list_work_package_relations",
 		"get_work_package_relation", "update_work_package_relation",
 		"delete_work_package_relation",
-	}},
-	"board": {IsDefault: false, Tools: []string{
-		"get_boards", "get_board", "create_board", "update_board",
-		"delete_board", "add_board_widget", "remove_board_widget",
 	}},
 	"notification": {IsDefault: false, Tools: []string{
 		"list_notifications", "mark_notification_read", "mark_all_notifications_read",
@@ -68,9 +60,6 @@ var toolGroups = map[string]ToolGroup{
 	"query": {IsDefault: false, Tools: []string{
 		"list_queries", "get_query",
 	}},
-	"wiki": {IsDefault: false, Tools: []string{
-		"list_wiki_pages", "get_wiki_page", "update_wiki_page",
-	}},
 	"placeholder": {IsDefault: false, Tools: []string{
 		"list_placeholder_users", "get_placeholder_user", "create_placeholder_user",
 	}},
@@ -78,7 +67,6 @@ var toolGroups = map[string]ToolGroup{
 		"view_configuration",
 	}},
 }
-
 
 // Registry holds all tool registrations.
 type Registry struct {
@@ -238,9 +226,6 @@ func (r *Registry) RegisterAllTools(server *mcp.Server) {
 	if r.shouldRegisterGroup("membership") {
 		r.registerMembershipTools(server)
 	}
-	if r.shouldRegisterGroup("time_entry") {
-		r.registerTimeEntryTools(server)
-	}
 	if r.shouldRegisterGroup("version") {
 		r.registerVersionTools(server)
 	}
@@ -249,9 +234,6 @@ func (r *Registry) RegisterAllTools(server *mcp.Server) {
 	}
 	if r.shouldRegisterGroup("search") {
 		r.registerSearchTools(server)
-	}
-	if r.shouldRegisterGroup("board") {
-		r.registerBoardTools(server)
 	}
 	if r.shouldRegisterGroup("notification") {
 		r.registerNotificationTools(server)
@@ -270,9 +252,6 @@ func (r *Registry) RegisterAllTools(server *mcp.Server) {
 	}
 	if r.shouldRegisterGroup("query") {
 		r.registerQueryTools(server)
-	}
-	if r.shouldRegisterGroup("wiki") {
-		r.registerWikiTools(server)
 	}
 	if r.shouldRegisterGroup("placeholder") {
 		r.registerPlaceholderTools(server)
