@@ -80,6 +80,7 @@ func (r *Registry) listGroups(ctx context.Context, req *mcp.CallToolRequest) (*m
 	}
 
 	resp, err := r.client.APIClient().ListGroups(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list groups: %v", err), nil
 	}
@@ -110,6 +111,7 @@ func (r *Registry) getGroup(ctx context.Context, req *mcp.CallToolRequest) (*mcp
 	}
 
 	resp, err := r.client.APIClient().GetGroup(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get group: %v", err), nil
 	}
@@ -146,6 +148,7 @@ func (r *Registry) createGroup(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 
 	resp, err := r.client.APIClient().CreateGroup(ctx, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create group: %v", err), nil
 	}
@@ -169,6 +172,7 @@ func (r *Registry) updateGroup(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 
 	resp, err := r.client.APIClient().UpdateGroup(ctx, args.ID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to update group: %v", err), nil
 	}
@@ -187,6 +191,7 @@ func (r *Registry) deleteGroup(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 
 	resp, err := r.client.APIClient().DeleteGroup(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to delete group: %v", err), nil
 	}

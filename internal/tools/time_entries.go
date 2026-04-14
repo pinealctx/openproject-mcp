@@ -117,6 +117,7 @@ func (r *Registry) listTimeEntries(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	resp, err := r.client.APIClient().ListTimeEntries(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list time entries: %v", err), nil
 	}
@@ -170,6 +171,7 @@ func (r *Registry) createTimeEntry(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	resp, err := r.client.APIClient().CreateTimeEntry(ctx, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create time entry: %v", err), nil
 	}
@@ -226,6 +228,7 @@ func (r *Registry) deleteTimeEntry(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	resp, err := r.client.APIClient().DeleteTimeEntry(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to delete time entry: %v", err), nil
 	}

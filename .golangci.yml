@@ -1,0 +1,47 @@
+version: "2"
+
+linters:
+  enable:
+    # Default-tier: correctness
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+
+    # Error handling
+    - errorlint     # enforce errors.Is/As instead of == / type assertion
+    - nilerr        # detect err != nil followed by return nil
+
+    # Security
+    - gosec
+
+    # Resource leaks
+    - bodyclose     # unclosed HTTP response bodies
+    - noctx         # HTTP requests without context
+
+    # Code quality
+    - gocritic      # broad set of style and performance checks
+    - durationcheck # time.Duration multiplication mistakes
+    - reassign      # accidental package-level variable reassignment
+    - intrange      # simplify range-over-int (Go 1.22+)
+    - mirror        # bytes/strings method suggestions
+    - exhaustive    # check proto/iota enum switch completeness
+    - testifylint   # catch testify misuse
+    - sqlclosecheck # ensure SQL Rows/Stmt are closed
+    - makezero      # detect make([]T, N) followed by append
+
+  settings:
+    gosec:
+      excludes:
+        - G104  # allow unchecked error on Close-like calls
+    gocritic:
+      disabled-checks:
+        - ifElseChain       # stylistic, too noisy
+        - singleCaseSwitch  # sometimes intentional for future expansion
+    exhaustive:
+      default-signifies-exhaustive: true # switch with default is considered exhaustive
+    errorlint:
+      comparison: true        # check == and != against error sentinels
+      errorf-wrapping: true   # check fmt.Errorf uses %w for wrapping
+

@@ -79,6 +79,7 @@ func (r *Registry) listDocuments(ctx context.Context, req *mcp.CallToolRequest) 
 	}
 
 	resp, err := r.client.APIClient().ListDocuments(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list documents: %v", err), nil
 	}
@@ -115,6 +116,7 @@ func (r *Registry) getDocument(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 
 	resp, err := r.client.APIClient().ViewDocument(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get document: %v", err), nil
 	}
@@ -156,6 +158,7 @@ func (r *Registry) updateDocument(ctx context.Context, req *mcp.CallToolRequest)
 	}
 
 	resp, err := r.client.APIClient().UpdateDocument(ctx, args.ID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to update document: %v", err), nil
 	}

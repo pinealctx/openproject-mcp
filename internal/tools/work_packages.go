@@ -176,6 +176,7 @@ func (r *Registry) listWorkPackages(ctx context.Context, req *mcp.CallToolReques
 			pParams.Filters = strPtr(args.Filters)
 		}
 		resp, err = r.client.APIClient().GetProjectWorkPackageCollection(ctx, args.ProjectID, pParams)
+	defer func() { _ = resp.Body.Close() }()
 	} else {
 		resp, err = r.client.APIClient().ListWorkPackages(ctx, params)
 	}
@@ -210,6 +211,7 @@ func (r *Registry) getWorkPackage(ctx context.Context, req *mcp.CallToolRequest)
 	}
 
 	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.ID, nil)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get work package: %v", err), nil
 	}
@@ -287,6 +289,7 @@ func (r *Registry) createWorkPackage(ctx context.Context, req *mcp.CallToolReque
 
 	params := &external.CreateProjectWorkPackageParams{}
 	resp, err := r.client.APIClient().CreateProjectWorkPackage(ctx, args.ProjectID, params, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create work package: %v", err), nil
 	}
@@ -305,6 +308,7 @@ func (r *Registry) updateWorkPackage(ctx context.Context, req *mcp.CallToolReque
 
 	// First fetch the work package to get LockVersion (required for patch)
 	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.ID, nil)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to fetch work package for lock version: %v", err), nil
 	}
@@ -337,10 +341,7 @@ func (r *Registry) updateWorkPackage(ctx context.Context, req *mcp.CallToolReque
 	if args.EstimatedTime != "" {
 		body.EstimatedTime = strPtr(args.EstimatedTime)
 	}
-	if args.PercentageDone != nil {
-		// PercentageDone is not in WorkPackagePatchModel; it must be set via custom fields or omitted
-		// The external client uses WorkPackagePatchModel which doesn't have percentageDone
-	}
+	// Note: PercentageDone is not supported by WorkPackagePatchModel in the generated client.
 
 	body.UnderscoreLinks = &struct {
 		Assignee    *external.Link `json:"assignee,omitempty"`
@@ -364,6 +365,8 @@ func (r *Registry) updateWorkPackage(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	resp, err = r.client.APIClient().UpdateWorkPackage(ctx, args.ID, nil, body)
+	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to update work package: %v", err), nil
 	}
@@ -381,6 +384,7 @@ func (r *Registry) deleteWorkPackage(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	resp, err := r.client.APIClient().DeleteWorkPackage(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to delete work package: %v", err), nil
 	}
@@ -400,6 +404,7 @@ func (r *Registry) listTypes(ctx context.Context, req *mcp.CallToolRequest) (*mc
 	var err error
 	if args.ProjectID > 0 {
 		resp, err = r.client.APIClient().ListTypesAvailableInAProject(ctx, args.ProjectID)
+	defer func() { _ = resp.Body.Close() }()
 	} else {
 		resp, err = r.client.APIClient().ListAllTypes(ctx)
 	}
@@ -423,6 +428,7 @@ func (r *Registry) listTypes(ctx context.Context, req *mcp.CallToolRequest) (*mc
 
 func (r *Registry) listStatuses(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resp, err := r.client.APIClient().ListStatuses(ctx)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list statuses: %v", err), nil
 	}
@@ -441,6 +447,7 @@ func (r *Registry) listStatuses(ctx context.Context, req *mcp.CallToolRequest) (
 
 func (r *Registry) listPriorities(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resp, err := r.client.APIClient().ListAllPriorities(ctx)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list priorities: %v", err), nil
 	}
@@ -464,6 +471,7 @@ func (r *Registry) listAvailableAssignees(ctx context.Context, req *mcp.CallTool
 	}
 
 	resp, err := r.client.APIClient().WorkPackageAvailableAssignees(ctx, args.WorkPackageID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list available assignees: %v", err), nil
 	}

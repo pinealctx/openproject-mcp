@@ -174,8 +174,6 @@ func runMCPServer(cmd *cobra.Command) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
@@ -187,6 +185,7 @@ func runMCPServer(cmd *cobra.Command) {
 
 	if err := srv.Run(ctx); err != nil {
 		slog.Error("Server error", "error", err)
+		cancel()
 		os.Exit(1)
 	}
 

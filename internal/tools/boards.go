@@ -122,9 +122,11 @@ func (r *Registry) getBoards(ctx context.Context, req *mcp.CallToolRequest) (*mc
 	}
 
 	resp, err := r.client.APIClient().ListGrids(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list boards: %v", err), nil
 	}
+	defer func() { _ = resp.Body.Close() }()
 
 	var list external.GridCollectionModel
 	if err := openproject.ReadResponse(resp, &list); err != nil {
@@ -149,9 +151,12 @@ func (r *Registry) getBoard(ctx context.Context, req *mcp.CallToolRequest) (*mcp
 	}
 
 	resp, err := r.client.APIClient().GetGrid(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get board: %v", err), nil
 	}
+	defer func() { _ = resp.Body.Close() }()
+
 	var grid external.GridReadModel
 	if err := openproject.ReadResponse(resp, &grid); err != nil {
 		return errorResult("Failed to get board: %v", err), nil
@@ -198,9 +203,11 @@ func (r *Registry) createBoard(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 
 	resp, err := r.client.APIClient().CreateGrid(ctx, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create board: %v", err), nil
 	}
+	defer func() { _ = resp.Body.Close() }()
 	var grid external.GridReadModel
 	if err := openproject.ReadResponse(resp, &grid); err != nil {
 		return errorResult("Failed to create board: %v", err), nil
@@ -223,6 +230,7 @@ func (r *Registry) updateBoard(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 
 	resp, err := r.client.APIClient().UpdateGrid(ctx, args.ID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to update board: %v", err), nil
 	}
@@ -254,6 +262,7 @@ func (r *Registry) addBoardWidget(ctx context.Context, req *mcp.CallToolRequest)
 
 	// First get the current board to read its widgets
 	resp, err := r.client.APIClient().GetGrid(ctx, args.BoardID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get board: %v", err), nil
 	}
@@ -271,13 +280,16 @@ func (r *Registry) addBoardWidget(ctx context.Context, req *mcp.CallToolRequest)
 		EndColumn:   args.EndColumn,
 	}
 
-	widgets := append(grid.Widgets, widget)
+	widgets := make([]external.GridWidgetModel, len(grid.Widgets)+1)
+	copy(widgets, grid.Widgets)
+	widgets[len(grid.Widgets)] = widget
 
 	body := external.GridWriteModel{
 		Widgets: &widgets,
 	}
 
 	resp, err = r.client.APIClient().UpdateGrid(ctx, args.BoardID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to add widget: %v", err), nil
 	}
@@ -297,6 +309,7 @@ func (r *Registry) removeBoardWidget(ctx context.Context, req *mcp.CallToolReque
 
 	// First get the current board
 	resp, err := r.client.APIClient().GetGrid(ctx, args.BoardID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get board: %v", err), nil
 	}
@@ -318,6 +331,7 @@ func (r *Registry) removeBoardWidget(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	resp, err = r.client.APIClient().UpdateGrid(ctx, args.BoardID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to remove widget: %v", err), nil
 	}

@@ -69,6 +69,7 @@ func (r *Registry) listWorkPackageActivities(ctx context.Context, req *mcp.CallT
 	}
 
 	resp, err := r.client.APIClient().ListWorkPackageActivities(ctx, args.WorkPackageID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list activities: %v", err), nil
 	}
@@ -124,6 +125,7 @@ func (r *Registry) createWorkPackageComment(ctx context.Context, req *mcp.CallTo
 	}
 
 	resp, err := r.client.APIClient().CommentWorkPackage(ctx, args.WorkPackageID, nil, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create comment: %v", err), nil
 	}

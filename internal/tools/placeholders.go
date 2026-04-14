@@ -65,6 +65,7 @@ func (r *Registry) listPlaceholderUsers(ctx context.Context, req *mcp.CallToolRe
 	}
 
 	resp, err := r.client.APIClient().ListPlaceholderUsers(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list placeholder users: %v", err), nil
 	}
@@ -95,6 +96,7 @@ func (r *Registry) getPlaceholderUser(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	resp, err := r.client.APIClient().ViewPlaceholderUser(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get placeholder user: %v", err), nil
 	}
@@ -123,6 +125,7 @@ func (r *Registry) createPlaceholderUser(ctx context.Context, req *mcp.CallToolR
 	}
 
 	resp, err := r.client.APIClient().CreatePlaceholderUser(ctx, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create placeholder user: %v", err), nil
 	}

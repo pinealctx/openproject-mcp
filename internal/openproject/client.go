@@ -79,7 +79,7 @@ func (c *Client) APIClient() *external.Client {
 // ReadResponse reads and unmarshals an HTTP response body into target.
 // Returns an APIError for non-2xx status codes.
 func ReadResponse(resp *http.Response, target any) error {
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
@@ -106,14 +106,14 @@ func ReadResponse(resp *http.Response, target any) error {
 
 // ReadResponseRaw reads the response body as bytes without unmarshaling.
 func ReadResponseRaw(resp *http.Response) ([]byte, error) {
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return io.ReadAll(resp.Body)
 }
 
 // ReadResponseRawTo reads the response and unmarshals into target, handling non-2xx as error.
 // This is similar to ReadResponse but works with raw map[string]interface{} types.
 func ReadResponseRawTo(resp *http.Response, target any) error {
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
@@ -162,14 +162,14 @@ func (c *Client) Delete(ctx context.Context, path string) error {
 // TestConnection tests the connection by fetching the current user.
 func (c *Client) TestConnection(ctx context.Context) (*external.UserModel, error) {
 	resp, err := c.apiClient.ListUsers(ctx, &external.ListUsersParams{
-		Filters: ptr(`[{"status":{"operator":"!","values":["*"]}}]`),
+		Filters:  ptr(`[{"status":{"operator":"!","values":["*"]}}]`),
 		PageSize: ptr(1),
 	})
 	if err != nil {
 		return nil, err
 	}
-	// Just check we can reach the API
-	_ = resp
+	// Just check we can reach the API; close body immediately.
+	_ = resp.Body.Close()
 	return c.GetCurrentUser(ctx)
 }
 
@@ -188,6 +188,7 @@ func (c *Client) GetAPIRoot(ctx context.Context) (*external.RootModel, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = resp.Body.Close() }()
 	var root external.RootModel
 	if err := ReadResponse(resp, &root); err != nil {
 		return nil, err
@@ -218,6 +219,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	return ReadResponse(resp, result)
 }
 

@@ -79,16 +79,6 @@ var toolGroups = map[string]ToolGroup{
 	}},
 }
 
-// allToolNames builds a set of all known tool names.
-var allToolNames = func() map[string]bool {
-	m := make(map[string]bool)
-	for _, g := range toolGroups {
-		for _, t := range g.Tools {
-			m[t] = true
-		}
-	}
-	return m
-}()
 
 // Registry holds all tool registrations.
 type Registry struct {
@@ -149,16 +139,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func ptrStr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
 
-func ptrInt(i int) *int {
-	return &i
-}
 
 // NewRegistry creates a new tool registry.
 func NewRegistry(client *openproject.Client) *Registry {
@@ -308,13 +289,13 @@ func ToolModeHelp() string {
 	b.WriteString("Default mode groups (always enabled in 'default' mode):\n")
 	for name, g := range toolGroups {
 		if g.IsDefault {
-			b.WriteString(fmt.Sprintf("  %s: %s\n", name, strings.Join(g.Tools, ", ")))
+			fmt.Fprintf(&b, "  %s: %s\n", name, strings.Join(g.Tools, ", "))
 		}
 	}
 	b.WriteString("\nFull-only mode groups (enabled in 'full' mode):\n")
 	for name, g := range toolGroups {
 		if !g.IsDefault {
-			b.WriteString(fmt.Sprintf("  %s: %s\n", name, strings.Join(g.Tools, ", ")))
+			fmt.Fprintf(&b, "  %s: %s\n", name, strings.Join(g.Tools, ", "))
 		}
 	}
 	return b.String()

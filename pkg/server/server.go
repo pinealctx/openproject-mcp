@@ -139,15 +139,16 @@ func (s *Server) runSSE(ctx context.Context) error {
 	})
 
 	httpServer := &http.Server{
-		Addr:    addr,
-		Handler: s.withClientMiddleware(sseHandler),
+		Addr:              addr,
+		Handler:           s.withClientMiddleware(sseHandler),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	// Handle shutdown
 	go func() {
 		<-ctx.Done()
 		s.logger.Info("Shutting down SSE server")
-		_ = httpServer.Shutdown(context.Background())
+		_ = httpServer.Shutdown(ctx)
 	}()
 
 	return httpServer.ListenAndServe()
@@ -166,15 +167,16 @@ func (s *Server) runHTTP(ctx context.Context) error {
 	}, nil)
 
 	httpServer := &http.Server{
-		Addr:    addr,
-		Handler: s.withClientMiddleware(httpHandler),
+		Addr:              addr,
+		Handler:           s.withClientMiddleware(httpHandler),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	// Handle shutdown
 	go func() {
 		<-ctx.Done()
 		s.logger.Info("Shutting down HTTP server")
-		_ = httpServer.Shutdown(context.Background())
+		_ = httpServer.Shutdown(ctx)
 	}()
 
 	return httpServer.ListenAndServe()

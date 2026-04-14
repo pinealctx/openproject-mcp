@@ -18,6 +18,7 @@ func (r *Registry) registerConfigurationTools(server *mcp.Server) {
 
 func (r *Registry) viewConfiguration(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resp, err := r.client.APIClient().ViewConfiguration(ctx)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to view configuration: %v", err), nil
 	}

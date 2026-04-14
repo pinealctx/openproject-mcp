@@ -89,6 +89,7 @@ func (r *Registry) setWorkPackageParent(ctx context.Context, req *mcp.CallToolRe
 
 	// Need to fetch current WP to get lockVersion
 	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.WorkPackageID, nil)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to fetch work package: %v", err), nil
 	}
@@ -120,6 +121,7 @@ func (r *Registry) setWorkPackageParent(ctx context.Context, req *mcp.CallToolRe
 	}
 
 	resp, err = r.client.APIClient().UpdateWorkPackage(ctx, args.WorkPackageID, nil, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to set parent: %v", err), nil
 	}
@@ -137,6 +139,7 @@ func (r *Registry) removeWorkPackageParent(ctx context.Context, req *mcp.CallToo
 
 	// Need to fetch current WP to get lockVersion
 	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.WorkPackageID, nil)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to fetch work package: %v", err), nil
 	}
@@ -168,6 +171,7 @@ func (r *Registry) removeWorkPackageParent(ctx context.Context, req *mcp.CallToo
 	}
 
 	resp, err = r.client.APIClient().UpdateWorkPackage(ctx, args.WorkPackageID, nil, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to remove parent: %v", err), nil
 	}
@@ -188,6 +192,7 @@ func (r *Registry) listWorkPackageChildren(ctx context.Context, req *mcp.CallToo
 		Filters: strPtr(fmt.Sprintf(`[{"parent":{"operator":"=","values":["%d"]}}]`, args.WorkPackageID)),
 	}
 	resp, err := r.client.APIClient().ListWorkPackages(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list children: %v", err), nil
 	}
@@ -226,6 +231,7 @@ func (r *Registry) createWorkPackageRelation(ctx context.Context, req *mcp.CallT
 	}
 
 	resp, err := r.client.APIClient().CreateRelation(ctx, args.FromID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create relation: %v", err), nil
 	}
@@ -246,6 +252,7 @@ func (r *Registry) listWorkPackageRelations(ctx context.Context, req *mcp.CallTo
 		Filters: strPtr(fmt.Sprintf(`[{"involved":{"operator":"=","values":["%d"]}}]`, args.WorkPackageID)),
 	}
 	resp, err := r.client.APIClient().ListRelations(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list relations: %v", err), nil
 	}
@@ -269,6 +276,7 @@ func (r *Registry) getWorkPackageRelation(ctx context.Context, req *mcp.CallTool
 	}
 
 	resp, err := r.client.APIClient().GetRelation(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get relation: %v", err), nil
 	}
@@ -297,6 +305,7 @@ func (r *Registry) updateWorkPackageRelation(ctx context.Context, req *mcp.CallT
 	}
 
 	resp, err := r.client.APIClient().UpdateRelation(ctx, args.ID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to update relation: %v", err), nil
 	}
@@ -314,6 +323,7 @@ func (r *Registry) deleteWorkPackageRelation(ctx context.Context, req *mcp.CallT
 	}
 
 	resp, err := r.client.APIClient().DeleteRelation(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to delete relation: %v", err), nil
 	}

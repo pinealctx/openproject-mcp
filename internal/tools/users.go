@@ -54,6 +54,7 @@ func (r *Registry) listUsers(ctx context.Context, req *mcp.CallToolRequest) (*mc
 	}
 
 	resp, err := r.client.APIClient().ListUsers(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list users: %v", err), nil
 	}
@@ -82,6 +83,7 @@ func (r *Registry) getUser(ctx context.Context, req *mcp.CallToolRequest) (*mcp.
 
 	// ViewUser takes string ID
 	resp, err := r.client.APIClient().ViewUser(ctx, fmt.Sprintf("%d", args.ID))
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get user: %v", err), nil
 	}

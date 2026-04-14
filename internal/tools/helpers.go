@@ -39,7 +39,7 @@ func parseArgs(args any, target any) error {
 	return json.Unmarshal(data, target)
 }
 
-// ptrTo returns the dereferenced value or a default.
+// derefStr returns the dereferenced string or empty.
 func derefStr(s *string) string {
 	if s == nil {
 		return ""
@@ -69,6 +69,10 @@ func strPtr(s string) *string {
 	return &s
 }
 
+func intPtr(i int) *int {
+	return &i
+}
+
 // normalizeSortBy converts "name:asc" or "name:asc,updatedAt:desc" format
 // to OpenProject API JSON array format: [["name","asc"]]
 func normalizeSortBy(s string) string {
@@ -94,10 +98,6 @@ func normalizeSortBy(s string) string {
 		pairs = append(pairs, fmt.Sprintf(`["%s","%s"]`, field, dir))
 	}
 	return "[" + strings.Join(pairs, ",") + "]"
-}
-
-func intPtr(i int) *int {
-	return &i
 }
 
 // parseDatePtr parses a YYYY-MM-DD string into an openapi_types.Date pointer.
@@ -150,45 +150,6 @@ func formatProject(p *external.ProjectModel) string {
 	result += fmt.Sprintf("- **Public:** %v\n", derefBool(p.Public))
 	if p.Description != nil && p.Description.Raw != nil && *p.Description.Raw != "" {
 		result += fmt.Sprintf("\n## Description\n%s\n", *p.Description.Raw)
-	}
-	return result
-}
-
-// formatWorkPackage formats a WorkPackageModel as markdown.
-func formatWorkPackage(wp *external.WorkPackageModel) string {
-	result := fmt.Sprintf("# %s\n\n", wp.Subject)
-	result += fmt.Sprintf("- **ID:** %d\n", derefInt(wp.Id))
-	if wp.LockVersion != nil {
-		result += fmt.Sprintf("- **Lock Version:** %d\n", *wp.LockVersion)
-	}
-	if wp.StartDate != nil {
-		result += fmt.Sprintf("- **Start Date:** %s\n", wp.StartDate.String())
-	}
-	if wp.DueDate != nil {
-		result += fmt.Sprintf("- **Due Date:** %s\n", wp.DueDate.String())
-	}
-	if wp.EstimatedTime != nil {
-		result += fmt.Sprintf("- **Estimated Time:** %s\n", *wp.EstimatedTime)
-	}
-	if wp.PercentageDone != nil {
-		result += fmt.Sprintf("- **%% Done:** %d\n", *wp.PercentageDone)
-	}
-	if wp.Description != nil && wp.Description.Raw != nil && *wp.Description.Raw != "" {
-		result += fmt.Sprintf("\n## Description\n%s\n", *wp.Description.Raw)
-	}
-
-	// Extract link titles for assignee, status, type, priority
-	if wp.UnderscoreLinks.Assignee != nil {
-		result += fmt.Sprintf("- **Assignee:** %s\n", derefStr(wp.UnderscoreLinks.Assignee.Title))
-	}
-	if wp.UnderscoreLinks.Status.Title != nil {
-		result += fmt.Sprintf("- **Status:** %s\n", *wp.UnderscoreLinks.Status.Title)
-	}
-	if wp.UnderscoreLinks.Type.Title != nil {
-		result += fmt.Sprintf("- **Type:** %s\n", *wp.UnderscoreLinks.Type.Title)
-	}
-	if wp.UnderscoreLinks.Priority.Title != nil {
-		result += fmt.Sprintf("- **Priority:** %s\n", *wp.UnderscoreLinks.Priority.Title)
 	}
 	return result
 }

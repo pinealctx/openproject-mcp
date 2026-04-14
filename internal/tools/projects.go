@@ -88,6 +88,7 @@ func (r *Registry) listProjects(ctx context.Context, req *mcp.CallToolRequest) (
 	}
 
 	resp, err := r.client.APIClient().ListProjects(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list projects: %v", err), nil
 	}
@@ -115,6 +116,7 @@ func (r *Registry) getProject(ctx context.Context, req *mcp.CallToolRequest) (*m
 	}
 
 	resp, err := r.client.APIClient().ViewProject(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get project: %v", err), nil
 	}
@@ -145,6 +147,7 @@ func (r *Registry) createProject(ctx context.Context, req *mcp.CallToolRequest) 
 	}
 
 	resp, err := r.client.APIClient().CreateProject(ctx, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create project: %v", err), nil
 	}
@@ -180,6 +183,7 @@ func (r *Registry) updateProject(ctx context.Context, req *mcp.CallToolRequest) 
 	}
 
 	resp, err := r.client.APIClient().UpdateProject(ctx, args.ID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to update project: %v", err), nil
 	}
@@ -197,6 +201,7 @@ func (r *Registry) deleteProject(ctx context.Context, req *mcp.CallToolRequest) 
 	}
 
 	resp, err := r.client.APIClient().DeleteProject(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to delete project: %v", err), nil
 	}

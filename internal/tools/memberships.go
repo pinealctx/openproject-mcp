@@ -88,6 +88,7 @@ func (r *Registry) listMemberships(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	resp, err := r.client.APIClient().ListMemberships(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list memberships: %v", err), nil
 	}
@@ -125,6 +126,7 @@ func (r *Registry) getMembership(ctx context.Context, req *mcp.CallToolRequest) 
 	}
 
 	resp, err := r.client.APIClient().GetMembership(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get membership: %v", err), nil
 	}
@@ -178,6 +180,7 @@ func (r *Registry) createMembership(ctx context.Context, req *mcp.CallToolReques
 	}
 
 	resp, err := r.client.APIClient().CreateMembership(ctx, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create membership: %v", err), nil
 	}
@@ -210,6 +213,7 @@ func (r *Registry) updateMembership(ctx context.Context, req *mcp.CallToolReques
 	}
 
 	resp, err := r.client.APIClient().UpdateMembership(ctx, args.ID, body)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to update membership: %v", err), nil
 	}
@@ -227,6 +231,7 @@ func (r *Registry) deleteMembership(ctx context.Context, req *mcp.CallToolReques
 	}
 
 	resp, err := r.client.APIClient().DeleteMembership(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to delete membership: %v", err), nil
 	}
@@ -247,6 +252,7 @@ func (r *Registry) listProjectMembers(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	resp, err := r.client.APIClient().ListMemberships(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list project members: %v", err), nil
 	}
@@ -273,6 +279,7 @@ func (r *Registry) listProjectMembers(ctx context.Context, req *mcp.CallToolRequ
 
 func (r *Registry) listRoles(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resp, err := r.client.APIClient().ListRoles(ctx, nil)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list roles: %v", err), nil
 	}
@@ -306,6 +313,7 @@ func (r *Registry) getRole(ctx context.Context, req *mcp.CallToolRequest) (*mcp.
 	}
 
 	resp, err := r.client.APIClient().ViewRole(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get role: %v", err), nil
 	}

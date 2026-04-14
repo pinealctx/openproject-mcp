@@ -60,6 +60,7 @@ func (r *Registry) listNotifications(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	resp, err := r.client.APIClient().ListNotifications(ctx, params)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list notifications: %v", err), nil
 	}
@@ -113,6 +114,7 @@ func (r *Registry) markNotificationRead(ctx context.Context, req *mcp.CallToolRe
 	}
 
 	resp, err := r.client.APIClient().ReadNotification(ctx, args.ID)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to mark notification as read: %v", err), nil
 	}
@@ -124,6 +126,7 @@ func (r *Registry) markNotificationRead(ctx context.Context, req *mcp.CallToolRe
 
 func (r *Registry) markAllNotificationsRead(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resp, err := r.client.APIClient().ReadNotifications(ctx, nil)
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to mark all notifications as read: %v", err), nil
 	}
