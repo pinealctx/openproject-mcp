@@ -29,6 +29,10 @@ type Config struct {
 
 	// HTTP client settings
 	Timeout time.Duration
+
+	// Tool mode settings
+	ToolMode      string // "default", "full", "custom"
+	EnabledTools  string // comma-separated tool names for custom mode
 }
 
 // Load reads configuration from environment variables.
@@ -41,6 +45,8 @@ func Load() *Config {
 		Transport:      getEnv("TRANSPORT", "stdio"),
 		Port:           getEnvInt("PORT", 8080),
 		Timeout:        30 * time.Second,
+		ToolMode:       getEnv("TOOL_MODE", "default"),
+		EnabledTools:   getEnv("ENABLED_TOOLS", ""),
 	}
 }
 
@@ -84,6 +90,13 @@ func (c *Config) Validate() error {
 		if proxyURL.Scheme != "http" && proxyURL.Scheme != "https" && proxyURL.Scheme != "socks5" {
 			return errors.New("proxy URL must use http, https, or socks5 scheme")
 		}
+	}
+
+	if c.ToolMode != "default" && c.ToolMode != "full" && c.ToolMode != "custom" {
+		return fmt.Errorf("invalid TOOL_MODE: must be 'default', 'full', or 'custom', got '%s'", c.ToolMode)
+	}
+	if c.ToolMode == "custom" && c.EnabledTools == "" {
+		return errors.New("ENABLED_TOOLS is required when TOOL_MODE is 'custom'")
 	}
 
 	return nil

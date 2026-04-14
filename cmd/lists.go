@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -26,11 +27,16 @@ Examples:
   # Output as JSON to find status IDs
   openproject-mcp status -o json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		list, err := getClient().ListStatuses(getContext())
+		api := getClient().APIClient()
+		resp, err := api.ListStatuses(getContext())
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var result openproject.StatusCollectionModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -54,11 +60,16 @@ Examples:
   openproject-mcp priority -o json`,
 	Aliases: []string{"priorities"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		list, err := getClient().ListPriorities(getContext())
+		api := getClient().APIClient()
+		resp, err := api.ListAllPriorities(getContext())
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var result openproject.PriorityCollectionModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -88,6 +99,7 @@ Examples:
 	Aliases: []string{"types"},
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		api := getClient().APIClient()
 		var projectID int
 		if len(args) > 0 {
 			id, err := strconv.Atoi(args[0])
@@ -96,17 +108,28 @@ Examples:
 			}
 			projectID = id
 		}
-		var list interface{}
-		var err error
+
 		if projectID > 0 {
-			list, err = getClient().ListProjectTypes(getContext(), projectID)
-		} else {
-			list, err = getClient().ListTypes(getContext())
+			resp, err := api.ListTypesAvailableInAProject(getContext(), projectID)
+			if err != nil {
+				return err
+			}
+			var result openproject.TypesByWorkspaceModel
+			if err := openproject.ReadResponse(resp, &result); err != nil {
+				return err
+			}
+			return output(&result)
 		}
+
+		resp, err := api.ListAllTypes(getContext())
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var result openproject.TypesByWorkspaceModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -135,11 +158,20 @@ Examples:
   openproject-mcp membership create -p 42 -u 5 -r "3,4"`,
 	Aliases: []string{"roles"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		list, err := getClient().ListRoles(getContext())
+		api := getClient().APIClient()
+		resp, err := api.ListRoles(getContext(), nil)
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var collection struct {
+			UnderscoreEmbedded struct {
+				Elements []openproject.RoleModel `json:"elements"`
+			} `json:"_embedded"`
+		}
+		if err := openproject.ReadResponse(resp, &collection); err != nil {
+			return err
+		}
+		return outputRoleList(collection.UnderscoreEmbedded.Elements)
 	},
 }
 

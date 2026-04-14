@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 type ListVersionsArgs struct{ ProjectID int }
@@ -39,33 +40,59 @@ func (r *Registry) registerVersionTools(server *mcp.Server) {
 func (r *Registry) listVersions(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListVersionsArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	list, err := r.client.ListVersions(ctx, args.ProjectID)
+	// ListVersionsAvailableInAProject returns versions for a project
+	resp, err := r.client.APIClient().ListVersionsAvailableInAProject(ctx, args.ProjectID)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list versions: %v", err)}}}, nil
+		return errorResult("Failed to list versions: %v", err), nil
+	}
+
+	var list external.VersionCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list versions: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d versions:\n\n", list.Total)
-	for _, v := range list.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d) — %s\n", v.Name, v.ID, v.Status)
+	for _, v := range list.UnderscoreEmbedded.Elements {
+		result += fmt.Sprintf("- **%s** (ID: %d) — %s\n", v.Name, v.Id, string(v.Status))
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) createVersion(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args CreateVersionArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.CreateVersionOptions{
-		Name: args.Name, Description: args.Description, StartDate: args.StartDate, EndDate: args.EndDate, ProjectID: args.ProjectID,
+	body := external.VersionWriteModel{
+		Name: strPtr(args.Name),
+		UnderscoreLinks: &struct {
+			DefiningProject *external.Link `json:"definingProject,omitempty"`
+		}{
+			DefiningProject: &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/projects/%d", args.ProjectID))},
+		},
 	}
-	version, err := r.client.CreateVersion(ctx, opts)
+	if args.Description != "" {
+		fmt := external.FormattableFormat("markdown")
+		body.Description = &external.Formattable{Format: &fmt, Raw: strPtr(args.Description)}
+	}
+	if args.StartDate != "" {
+		body.StartDate = parseDatePtr(args.StartDate)
+	}
+	if args.EndDate != "" {
+		body.EndDate = parseDatePtr(args.EndDate)
+	}
+
+	resp, err := r.client.APIClient().CreateVersion(ctx, body)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to create version: %v", err)}}}, nil
+		return errorResult("Failed to create version: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Version #%d created: %s", version.ID, version.Name)}}}, nil
+	var version external.VersionReadModel
+	if err := openproject.ReadResponse(resp, &version); err != nil {
+		return errorResult("Failed to create version: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Version #%d created: %s", version.Id, version.Name)), nil
 }

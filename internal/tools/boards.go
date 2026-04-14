@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 type GetBoardsArgs struct {
@@ -106,151 +107,224 @@ func (r *Registry) registerBoardTools(server *mcp.Server) {
 func (r *Registry) getBoards(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args GetBoardsArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	var filters string
-	if args.ProjectID > 0 {
-		filters = fmt.Sprintf(`[{"scope":{"operator":"=","values":["/api/v3/projects/%d"]}}]`, args.ProjectID)
+	params := &external.ListGridsParams{}
+	if args.Offset > 0 {
+		params.Offset = intPtr(args.Offset)
 	}
-	list, err := r.client.ListGrids(ctx, &openproject.ListGridsOptions{
-		Offset:   args.Offset,
-		PageSize: args.PageSize,
-		Filters:  filters,
-	})
+	if args.PageSize > 0 {
+		params.PageSize = intPtr(args.PageSize)
+	}
+	if args.ProjectID > 0 {
+		params.Filters = strPtr(fmt.Sprintf(`[{"scope":{"operator":"=","values":["/api/v3/projects/%d"]}}]`, args.ProjectID))
+	}
+
+	resp, err := r.client.APIClient().ListGrids(ctx, params)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list boards: %v", err)}}}, nil
+		return errorResult("Failed to list boards: %v", err), nil
+	}
+
+	var list external.GridCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list boards: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d boards:\n\n", list.Total)
-	for _, g := range list.Embedded.Elements {
+	for _, g := range list.UnderscoreEmbedded.Elements {
 		scope := ""
-		if g.Links != nil && g.Links.Scope != nil {
-			scope = " — Scope: " + g.Links.Scope.Href
+		if g.UnderscoreLinks.Scope.Href != nil {
+			scope = " — Scope: " + *g.UnderscoreLinks.Scope.Href
 		}
-		result += fmt.Sprintf("- Board #%d (%dx%d)%s\n", g.ID, g.ColumnCount, g.RowCount, scope)
+		result += fmt.Sprintf("- Board #%d (%dx%d)%s\n", g.Id, g.ColumnCount, g.RowCount, scope)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) getBoard(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args GetBoardArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	grid, err := r.client.GetGrid(ctx, args.ID)
+	resp, err := r.client.APIClient().GetGrid(ctx, args.ID)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to get board: %v", err)}}}, nil
+		return errorResult("Failed to get board: %v", err), nil
+	}
+	var grid external.GridReadModel
+	if err := openproject.ReadResponse(resp, &grid); err != nil {
+		return errorResult("Failed to get board: %v", err), nil
 	}
 
-	result := fmt.Sprintf("# Board #%d\n\n", grid.ID)
+	result := fmt.Sprintf("# Board #%d\n\n", grid.Id)
 	result += fmt.Sprintf("- **Columns:** %d\n", grid.ColumnCount)
 	result += fmt.Sprintf("- **Rows:** %d\n", grid.RowCount)
-	if grid.Links != nil && grid.Links.Scope != nil {
-		result += fmt.Sprintf("- **Scope:** %s\n", grid.Links.Scope.Href)
+	if grid.UnderscoreLinks.Scope.Href != nil {
+		result += fmt.Sprintf("- **Scope:** %s\n", *grid.UnderscoreLinks.Scope.Href)
 	}
-	if grid.Embedded != nil && len(grid.Embedded.Widgets) > 0 {
-		result += fmt.Sprintf("\n## Widgets (%d):\n\n", len(grid.Embedded.Widgets))
-		for _, w := range grid.Embedded.Widgets {
-			result += fmt.Sprintf("- #%d **%s** col %d-%d, row %d-%d\n",
-				w.ID, w.Identifier, w.StartColumn, w.EndColumn, w.StartRow, w.EndRow)
+	if len(grid.Widgets) > 0 {
+		result += fmt.Sprintf("\n## Widgets (%d):\n\n", len(grid.Widgets))
+		for _, w := range grid.Widgets {
+			widgetID := ""
+			if w.Id != nil {
+				widgetID = fmt.Sprintf(" #%d", *w.Id)
+			}
+			result += fmt.Sprintf("-%s **%s** col %d-%d, row %d-%d\n",
+				widgetID, w.Identifier, w.StartColumn, w.EndColumn, w.StartRow, w.EndRow)
 		}
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) createBoard(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args CreateBoardArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.CreateGridOptions{
-		RowCount:    args.RowCount,
-		ColumnCount: args.ColumnCount,
+	body := external.GridWriteModel{
+		UnderscoreLinks: &struct {
+			Scope *external.Link `json:"scope,omitempty"`
+		}{
+			Scope: &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/projects/%d", args.ProjectID))},
+		},
 	}
-	grid, err := r.client.CreateGrid(ctx, args.ProjectID, opts)
+	if args.RowCount > 0 {
+		body.RowCount = intPtr(args.RowCount)
+	}
+	if args.ColumnCount > 0 {
+		body.ColumnCount = intPtr(args.ColumnCount)
+	}
+
+	resp, err := r.client.APIClient().CreateGrid(ctx, body)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to create board: %v", err)}}}, nil
+		return errorResult("Failed to create board: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Board #%d created (%dx%d) for project %d!", grid.ID, grid.ColumnCount, grid.RowCount, args.ProjectID)}}}, nil
+	var grid external.GridReadModel
+	if err := openproject.ReadResponse(resp, &grid); err != nil {
+		return errorResult("Failed to create board: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Board #%d created (%dx%d) for project %d!", grid.Id, grid.ColumnCount, grid.RowCount, args.ProjectID)), nil
 }
 
 func (r *Registry) updateBoard(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args UpdateBoardArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.UpdateGridOptions{
-		RowCount:    args.RowCount,
-		ColumnCount: args.ColumnCount,
+	body := external.GridWriteModel{}
+	if args.RowCount > 0 {
+		body.RowCount = intPtr(args.RowCount)
 	}
-	grid, err := r.client.UpdateGrid(ctx, args.ID, opts)
+	if args.ColumnCount > 0 {
+		body.ColumnCount = intPtr(args.ColumnCount)
+	}
+
+	resp, err := r.client.APIClient().UpdateGrid(ctx, args.ID, body)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to update board: %v", err)}}}, nil
+		return errorResult("Failed to update board: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Board #%d updated (%dx%d)!", grid.ID, grid.ColumnCount, grid.RowCount)}}}, nil
+	var grid external.GridReadModel
+	if err := openproject.ReadResponse(resp, &grid); err != nil {
+		return errorResult("Failed to update board: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Board #%d updated (%dx%d)!", grid.Id, grid.ColumnCount, grid.RowCount)), nil
 }
 
 func (r *Registry) deleteBoard(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args DeleteBoardArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	if err := r.client.DeleteGrid(ctx, args.ID); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to delete board: %v", err)}}}, nil
+	// DeleteGrid is not available in the generated client; use raw DELETE
+	if err := r.client.Delete(ctx, fmt.Sprintf("/grids/%d", args.ID)); err != nil {
+		return errorResult("Failed to delete board: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Board #%d deleted successfully!", args.ID)}}}, nil
+	return textResult(fmt.Sprintf("Board #%d deleted successfully!", args.ID)), nil
 }
 
 func (r *Registry) addBoardWidget(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args AddBoardWidgetArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	widget := openproject.GridWidget{
+	// First get the current board to read its widgets
+	resp, err := r.client.APIClient().GetGrid(ctx, args.BoardID)
+	if err != nil {
+		return errorResult("Failed to get board: %v", err), nil
+	}
+	var grid external.GridReadModel
+	if err := openproject.ReadResponse(resp, &grid); err != nil {
+		return errorResult("Failed to get board: %v", err), nil
+	}
+
+	// Create the new widget
+	widget := external.GridWidgetModel{
 		Identifier:  args.Identifier,
 		StartRow:    args.StartRow,
 		EndRow:      args.EndRow,
 		StartColumn: args.StartColumn,
 		EndColumn:   args.EndColumn,
 	}
-	if args.QueryID > 0 {
-		widget.Links = &openproject.GridWidgetLinks{
-			Query: &openproject.Link{Href: fmt.Sprintf("/api/v3/queries/%d", args.QueryID)},
-		}
+
+	widgets := append(grid.Widgets, widget)
+
+	body := external.GridWriteModel{
+		Widgets: &widgets,
 	}
 
-	grid, err := r.client.AddGridWidget(ctx, args.BoardID, widget)
+	resp, err = r.client.APIClient().UpdateGrid(ctx, args.BoardID, body)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to add widget: %v", err)}}}, nil
+		return errorResult("Failed to add widget: %v", err), nil
+	}
+	var updated external.GridReadModel
+	if err := openproject.ReadResponse(resp, &updated); err != nil {
+		return errorResult("Failed to add widget: %v", err), nil
 	}
 
-	widgetCount := 0
-	if grid.Embedded != nil {
-		widgetCount = len(grid.Embedded.Widgets)
-	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Widget added to board #%d. Board now has %d widgets.", args.BoardID, widgetCount)}}}, nil
+	return textResult(fmt.Sprintf("Widget added to board #%d. Board now has %d widgets.", args.BoardID, len(updated.Widgets))), nil
 }
 
 func (r *Registry) removeBoardWidget(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args RemoveBoardWidgetArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	grid, err := r.client.RemoveGridWidget(ctx, args.BoardID, args.WidgetID)
+	// First get the current board
+	resp, err := r.client.APIClient().GetGrid(ctx, args.BoardID)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to remove widget: %v", err)}}}, nil
+		return errorResult("Failed to get board: %v", err), nil
+	}
+	var grid external.GridReadModel
+	if err := openproject.ReadResponse(resp, &grid); err != nil {
+		return errorResult("Failed to get board: %v", err), nil
 	}
 
-	widgetCount := 0
-	if grid.Embedded != nil {
-		widgetCount = len(grid.Embedded.Widgets)
+	// Filter out the widget with the given ID
+	var widgets []external.GridWidgetModel
+	for _, w := range grid.Widgets {
+		if w.Id == nil || *w.Id != args.WidgetID {
+			widgets = append(widgets, w)
+		}
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Widget #%d removed from board #%d. Board now has %d widgets.", args.WidgetID, args.BoardID, widgetCount)}}}, nil
+
+	body := external.GridWriteModel{
+		Widgets: &widgets,
+	}
+
+	resp, err = r.client.APIClient().UpdateGrid(ctx, args.BoardID, body)
+	if err != nil {
+		return errorResult("Failed to remove widget: %v", err), nil
+	}
+	var updated external.GridReadModel
+	if err := openproject.ReadResponse(resp, &updated); err != nil {
+		return errorResult("Failed to remove widget: %v", err), nil
+	}
+
+	return textResult(fmt.Sprintf("Widget #%d removed from board #%d. Board now has %d widgets.", args.WidgetID, args.BoardID, len(updated.Widgets))), nil
 }

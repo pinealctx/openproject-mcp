@@ -91,14 +91,15 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 }
 
-// createMCPServer creates and configures the MCP server with all tools for the given client.
+// createMCPServer creates and configures the MCP server with tools for the given client.
+// Tool registration is filtered by the configured tool mode (default/full/custom).
 func (s *Server) createMCPServer(client *openproject.Client) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "openproject-mcp",
 		Version: s.version,
 	}, nil)
 
-	registry := tools.NewRegistry(client)
+	registry := tools.NewRegistryWithMode(client, s.config.ToolMode, s.config.EnabledTools)
 	registry.RegisterAllTools(server)
 
 	return server

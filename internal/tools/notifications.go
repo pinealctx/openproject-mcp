@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 type ListNotificationsArgs struct {
@@ -44,24 +45,32 @@ func (r *Registry) registerNotificationTools(server *mcp.Server) {
 func (r *Registry) listNotifications(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListNotificationsArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.ListNotificationsOptions{
-		PageSize: args.PageSize,
-		Offset:   args.Offset,
+	params := &external.ListNotificationsParams{}
+	if args.Offset > 0 {
+		params.Offset = intPtr(args.Offset)
+	}
+	if args.PageSize > 0 {
+		params.PageSize = intPtr(args.PageSize)
 	}
 	if args.Unread {
-		opts.ReadIAN = "f" // OpenProject API uses "f"/"t" not "false"/"true"
+		params.Filters = strPtr(`[{"readIAN":{"operator":"!","values":["t"]}}]`)
 	}
 
-	list, err := r.client.ListNotifications(ctx, opts)
+	resp, err := r.client.APIClient().ListNotifications(ctx, params)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list notifications: %v", err)}}}, nil
+		return errorResult("Failed to list notifications: %v", err), nil
+	}
+
+	var list external.NotificationCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list notifications: %v", err), nil
 	}
 
 	if list.Total == 0 {
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "No notifications found."}}}, nil
+		return textResult("No notifications found."), nil
 	}
 
 	label := "all"
@@ -70,44 +79,56 @@ func (r *Registry) listNotifications(ctx context.Context, req *mcp.CallToolReque
 	}
 	result := fmt.Sprintf("Found %d %s notifications:\n\n", list.Total, label)
 
-	for _, n := range list.Embedded.Elements {
+	for _, n := range list.UnderscoreEmbedded.Elements {
 		read := "unread"
 		if n.ReadIAN != nil && *n.ReadIAN {
 			read = "read"
 		}
 		resource := ""
-		if n.Links != nil && n.Links.Resource != nil {
-			resource = " — " + n.Links.Resource.Title
+		if n.UnderscoreLinks != nil && n.UnderscoreLinks.Resource.Title != nil {
+			resource = " — " + *n.UnderscoreLinks.Resource.Title
 		}
 		project := ""
-		if n.Links != nil && n.Links.Project != nil && n.Links.Project.Title != "" {
-			project = " [" + n.Links.Project.Title + "]"
+		if n.UnderscoreLinks != nil && n.UnderscoreLinks.Project.Title != nil {
+			project = " [" + *n.UnderscoreLinks.Project.Title + "]"
 		}
 		createdAt := ""
 		if n.CreatedAt != nil {
 			createdAt = " (" + n.CreatedAt.Format("2006-01-02 15:04") + ")"
 		}
+		reason := ""
+		if n.Reason != nil {
+			reason = string(*n.Reason)
+		}
 		result += fmt.Sprintf("- **#%d** [%s] reason: `%s`%s%s%s\n",
-			n.ID, read, n.Reason, resource, project, createdAt)
+			derefInt(n.Id), read, reason, resource, project, createdAt)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) markNotificationRead(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args MarkNotificationReadArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	if err := r.client.MarkNotificationRead(ctx, args.ID); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to mark notification as read: %v", err)}}}, nil
+	resp, err := r.client.APIClient().ReadNotification(ctx, args.ID)
+	if err != nil {
+		return errorResult("Failed to mark notification as read: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Notification #%d marked as read.", args.ID)}}}, nil
+	if err := openproject.ReadResponse(resp, nil); err != nil {
+		return errorResult("Failed to mark notification as read: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Notification #%d marked as read.", args.ID)), nil
 }
 
 func (r *Registry) markAllNotificationsRead(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if err := r.client.MarkAllNotificationsRead(ctx); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to mark all notifications as read: %v", err)}}}, nil
+	resp, err := r.client.APIClient().ReadNotifications(ctx, nil)
+	if err != nil {
+		return errorResult("Failed to mark all notifications as read: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "All notifications marked as read."}}}, nil
+	if err := openproject.ReadResponse(resp, nil); err != nil {
+		return errorResult("Failed to mark all notifications as read: %v", err), nil
+	}
+	return textResult("All notifications marked as read."), nil
 }

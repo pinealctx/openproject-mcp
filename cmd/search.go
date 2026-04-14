@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"net/url"
+
 	"github.com/spf13/cobra"
 )
 
@@ -39,11 +42,17 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := args[0]
-		results, err := getClient().Search(getContext(), query, searchType, searchLimit)
-		if err != nil {
+		// Build search URL
+		path := fmt.Sprintf("/search?query=%s&limit=%d", url.QueryEscape(query), searchLimit)
+		if searchType != "" {
+			path += fmt.Sprintf("&type=%s", url.QueryEscape(searchType))
+		}
+
+		var result interface{}
+		if err := getClient().Get(getContext(), path, &result); err != nil {
 			return err
 		}
-		return output(results)
+		return output(result)
 	},
 }
 

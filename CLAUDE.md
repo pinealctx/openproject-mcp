@@ -4,64 +4,104 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-An MCP (Model Context Protocol) server in Go that exposes 48 tools for interacting with the OpenProject API v3. Built with the official [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) (`github.com/modelcontextprotocol/go-sdk v0.3.0`).
+An MCP (Model Context Protocol) server in Go that exposes 80+ tools for interacting with the OpenProject API v3. Built with the official [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) and the generated [OpenProject API client](https://github.com/pinealctx/openproject) (`github.com/pinealctx/openproject`).
 
-**Dual-mode operation:**
-1. **MCP Server** (default): stdio/SSE/HTTP transports for AI assistants
-2. **CLI**: Direct command-line interaction via Cobra subcommands
-
-## Build & Run
-
-```bash
-make build          # Build binary to ./build/openproject-mcp
-make test           # Run all tests (go test -v ./...)
-make build-all      # Cross-compile for linux/darwin/windows
-make deps           # go mod download && go mod tidy
-make clean          # Remove build artifacts
-```
-
-Run a single test: `go test -v -run TestName ./path/to/package`
-
-**Environment:** Requires `OPENPROJECT_URL` and `OPENPROJECT_API_KEY` env vars. Supports three transport modes: `stdio` (default, for MCP clients), `sse`, and `http`. Transport and port configurable via flags (`-transport=sse -port=3000`) or env vars (`TRANSPORT`, `PORT`).
+Also provides a CLI for direct OpenProject operations.
 
 ## Architecture
 
 ```
-main.go                        → Entry point: delegates to cmd.Execute()
-cmd/                           → Cobra CLI (root.go + domain files)
-  root.go                      → Global flags, client init, default → MCP server
-  mcp.go                       → MCP subcommand: transport/port flags
-  *.go                         → Domain CLI commands (project.go, work_package.go, etc.)
-internal/config/               → Env-based configuration (Config struct, validation)
-internal/openproject/          → API client layer
-  client.go                    → HTTP client with Basic Auth (apikey:<token>) against /api/v3/*
-  types.go                     → HAL+JSON response types, RichText helper
-  *.go                         → Domain methods (projects, work_packages, users, etc.)
-internal/tools/                → MCP tool definitions
-  tools.go                     → Registry that wires all tools to the MCP server
-  *.go                         → Tool handlers grouped by domain with Args structs
-pkg/server/                    → MCP server setup: creates mcp.Server, registers tools, runs transport
+cmd/                     CLI commands and MCP server entrypoint
+  root.go               Root cobra command, client init
+  mcp.go                MCP server subcommand (stdio/sse/http)
+  output.go             CLI output formatting (tabwriter + JSON)
+  *.go                  One file per CLI domain (project, work_package, etc.)
+
+internal/
+  config/               Configuration from env vars
+    config.go           Config struct, Load(), Validate()
+  openproject/          Adapter wrapping the external API client
+    client.go           Client struct, NewClient(), NewClientDirect(), APIClient()
+    types.go            Type aliases re-exporting external module types
+  tools/                MCP tool handlers (one file per group)
+    tools.go            Registry, tool mode selection, schema helpers
+    helpers.go          Shared helpers (parseArgs, formatUser, etc.)
+    connection.go       test_connection, check_permissions, get_current_user, get_api_info
+    projects.go         list/get/create/update/delete_project
+    work_packages.go    list/get/create/update/delete_work_package + types/statuses/priorities
+    users.go            list_users, get_user
+    memberships.go      list/get/create/update/delete_membership + list_project_members, list_roles, get_role
+    time_entries.go     list/create/update/delete_time_entry + list_time_entry_activities
+    versions.go         list/create/update/delete_version
+    relations.go        parent/child ops + relation CRUD
+    search.go           search
+    boards.go           board CRUD + widget management
+    notifications.go    list/read notifications
+    comments.go         list activities, create comment
+    watchers.go         list/add/remove watchers
+    groups.go           group CRUD
+    documents.go        list/get/update documents
+    queries.go          list/get queries
+    wiki.go             list/get/update wiki pages
+    placeholders.go     placeholder user CRUD
+    configurations.go   view configuration
+
+pkg/server/             MCP server with multi-transport support
+  server.go             Server struct, stdio/sse/http transports, middleware
 ```
 
-**Key flow (MCP mode):** `main` → `cmd.Execute()` → `runMCPServer()` → `server.New()` → `server.Run()` → transport-specific handler → `createMCPServer()` → `tools.RegisterAllTools()`
+## Key Dependencies
 
-**Key flow (CLI mode):** `main` → `cmd.Execute()` → Cobra subcommand → uses global `client` → calls `openproject.Client` methods
+- **MCP SDK**: `github.com/modelcontextprotocol/go-sdk/mcp` — server, tools, transports
+- **OpenProject client**: `github.com/pinealctx/openproject` — oapi-codegen generated from OpenAPI spec
+- **JSON Schema**: `github.com/google/jsonschema-go/jsonschema` — tool input schemas
 
-## Credential Modes (HTTP/SSE only)
+## External Client Patterns
 
-1. **Server pre-configured (single-tenant):** Set `OPENPROJECT_URL` and `OPENPROJECT_API_KEY` at startup
-2. **Per-request credentials (multi-tenant):** Clients pass `X-OpenProject-URL` and `X-OpenProject-API-Key` headers; `pkg/server/withClientMiddleware` resolves client per-request with caching
+The external client (`github.com/pinealctx/openproject`) returns raw `(*http.Response, error)` from all API calls. Use `openproject.ReadResponse(resp, &target)` to unmarshal.
 
-For stdio transport, credentials are required at startup.
+Key API method naming differences:
+- `ViewProject` (not `GetProject`)
+- `ListAllTypes` / `ListTypesAvailableInAProject` (not `ListTypes`)
+- `ListAllPriorities` (not `ListPriorities`)
+- `CreateProjectWorkPackage` takes `WorkPackageModel` body
+- `UpdateWorkPackage` uses `WorkPackagePatchModel` (requires `LockVersion`)
 
-## Patterns to Follow
+Auth is injected via `external.WithRequestEditorFn(basicAuthEditor(apiKey))`.
 
-- Tool handlers are methods on `tools.Registry` and return `(*mcp.CallToolResult, error)`. Errors from the OpenProject API are returned as `IsError: true` in the result, not as Go errors.
-- Each domain (projects, work_packages, etc.) has parallel files: `internal/openproject/<domain>.go` (API methods) and `internal/tools/<domain>.go` (MCP tools). CLI commands live in `cmd/<domain>.go`.
-- Tool argument structs are defined at the top of each tools file (e.g., `ListProjectsArgs`, `CreateProjectArgs`).
-- API response types use HAL+JSON: `_links` mapped to typed `*Links` structs, `_embedded` mapped to structs with `Elements` slices.
-- `RichText` type handles OpenProject's `{"format":"markdown","raw":"..."}` format — use `NewRichText(s)` for description fields in write requests.
-- The `openproject.Client` exposes `Get`, `Post`, `Patch`, `Delete` methods that prepend `/api/v3` to paths.
-- Version is injected at build time via `-ldflags "-X main.Version=$(VERSION)"`.
-- Logging goes to stderr (JSON for stdio transport, text for others) to avoid interfering with MCP protocol on stdout.
-- URL query parameters with JSON filters must be URL-encoded (use `url.QueryEscape`).
+## Tool Mode System
+
+Three modes control which MCP tools are registered:
+
+| Mode | Tool Count | Config |
+|------|-----------|--------|
+| `default` | ~22 core tools | `TOOL_MODE=default` |
+| `full` | ~80+ all tools | `TOOL_MODE=full` |
+| `custom` | user-selected | `TOOL_MODE=custom ENABLED_TOOLS=list_projects,get_project` |
+
+Default groups: connection, project, work_package, user, version, search
+Full-only groups: membership, time_entry, relation, board, notification, comment, watcher, group, document, query, wiki, placeholder, configuration
+
+## Transports
+
+- **stdio** — requires `OPENPROJECT_URL` + `OPENPROJECT_API_KEY` env vars
+- **sse** — port-based, supports per-request auth via `X-OpenProject-URL` / `X-OpenProject-API-Key` headers
+- **http** — streamable HTTP, same header-based auth as SSE
+
+## Build & Run
+
+```bash
+make build                    # Build binary
+make test                     # Run tests
+./build/openproject-mcp mcp   # Start MCP server (stdio)
+./build/openproject-mcp mcp --transport http --port 8080 --tool-mode full
+./build/openproject-mcp project list  # CLI usage
+```
+
+## Conventions
+
+- All external types use pointer fields (`*string`, `*int`, `*bool`) — use `derefStr`/`derefInt`/`derefBool` helpers
+- `Formattable` type for rich text (description, comment) with `Format` and `Raw` fields
+- `FormattableFormat("markdown")` is a named type, not `*string`
+- Tool schemas use `jsonschema.Schema` — build with `newSchema()`, `schemaStr()`, etc.
+- CLI output uses type switches in `cmd/output.go` — add new types there

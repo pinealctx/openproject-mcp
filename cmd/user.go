@@ -49,15 +49,24 @@ var userListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all users",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := &openproject.ListUsersOptions{
-			PageSize: userListPageSize,
-			SortBy:   userListSortBy,
+		api := getClient().APIClient()
+		params := &openproject.ListUsersParams{}
+		if userListPageSize > 0 {
+			params.PageSize = ptr(userListPageSize)
 		}
-		users, err := getClient().ListUsers(getContext(), opts)
+		if userListSortBy != "" {
+			params.SortBy = ptr(normalizeSortBy(userListSortBy))
+		}
+
+		resp, err := api.ListUsers(getContext(), params)
 		if err != nil {
 			return err
 		}
-		return output(users)
+		var result openproject.UserCollectionModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -66,15 +75,21 @@ var userGetCmd = &cobra.Command{
 	Short: "Get user details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := strconv.Atoi(args[0])
-		if err != nil {
+		id := args[0]
+		// Validate it's numeric
+		if _, err := strconv.Atoi(id); err != nil {
 			return fmt.Errorf("invalid user ID: %s", args[0])
 		}
-		user, err := getClient().GetUser(getContext(), id)
+		api := getClient().APIClient()
+		resp, err := api.ViewUser(getContext(), id)
 		if err != nil {
 			return err
 		}
-		return output(user)
+		var result openproject.UserModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 

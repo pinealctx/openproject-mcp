@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -32,11 +33,16 @@ var versionListCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid project ID: %s", args[0])
 		}
-		list, err := getClient().ListVersions(getContext(), projectID)
+		api := getClient().APIClient()
+		resp, err := api.ListVersionsAvailableInAProject(getContext(), projectID)
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var result openproject.VersionCollectionModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -44,18 +50,36 @@ var versionCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new version",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := &openproject.CreateVersionOptions{
-			ProjectID:   versionCreateProjectID,
-			Name:        versionCreateName,
-			Description: versionCreateDescription,
-			StartDate:   versionCreateStartDate,
-			EndDate:     versionCreateEndDate,
+		body := external.VersionWriteModel{
+			Name: ptr(versionCreateName),
 		}
-		version, err := getClient().CreateVersion(getContext(), opts)
+		if versionCreateDescription != "" {
+			fmt_ := external.FormattableFormat("markdown")
+			body.Description = &external.Formattable{Format: &fmt_, Raw: ptr(versionCreateDescription)}
+		}
+		if versionCreateStartDate != "" {
+			body.StartDate = parseDate(versionCreateStartDate)
+		}
+		if versionCreateEndDate != "" {
+			body.EndDate = parseDate(versionCreateEndDate)
+		}
+		// Set the defining project link
+		body.UnderscoreLinks = &struct {
+			DefiningProject *external.Link `json:"definingProject,omitempty"`
+		}{
+			DefiningProject: &external.Link{Href: ptr(fmt.Sprintf("/api/v3/projects/%d", versionCreateProjectID))},
+		}
+
+		api := getClient().APIClient()
+		resp, err := api.CreateVersion(getContext(), body)
 		if err != nil {
 			return err
 		}
-		return output(version)
+		var result openproject.VersionReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 

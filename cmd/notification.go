@@ -52,17 +52,24 @@ var notificationListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List notifications",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := &openproject.ListNotificationsOptions{
-			PageSize: notificationListPageSize,
+		api := getClient().APIClient()
+		params := &openproject.ListNotificationsParams{}
+		if notificationListPageSize > 0 {
+			params.PageSize = ptr(notificationListPageSize)
 		}
 		if notificationListUnread {
-			opts.ReadIAN = "f" // OpenProject API uses "f"/"t" not "false"/"true"
+			params.Filters = ptr(`[{"readIAN":{"operator":"=","values":["f"]}}]`)
 		}
-		list, err := getClient().ListNotifications(getContext(), opts)
+
+		resp, err := api.ListNotifications(getContext(), params)
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var result openproject.NotificationCollectionModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -75,7 +82,12 @@ var notificationReadCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid notification ID: %s", args[0])
 		}
-		if err := getClient().MarkNotificationRead(getContext(), id); err != nil {
+		api := getClient().APIClient()
+		resp, err := api.ReadNotification(getContext(), id)
+		if err != nil {
+			return err
+		}
+		if err := openproject.ReadResponse(resp, nil); err != nil {
 			return err
 		}
 		fmt.Println("Notification marked as read")
@@ -87,7 +99,11 @@ var notificationReadAllCmd = &cobra.Command{
 	Use:   "read-all",
 	Short: "Mark all notifications as read",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := getClient().MarkAllNotificationsRead(getContext()); err != nil {
+		api := getClient().APIClient()
+		// ReadNotifications marks all matching notifications as read
+		// With empty filters it marks all as read
+		_, err := api.ReadNotifications(getContext(), nil)
+		if err != nil {
 			return err
 		}
 		fmt.Println("All notifications marked as read")

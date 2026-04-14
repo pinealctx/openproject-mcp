@@ -11,10 +11,8 @@ import (
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
-// outputWriter is the output destination.
 var outputWriter io.Writer = os.Stdout
 
-// output prints data in the configured format.
 func output(data interface{}) error {
 	if flagOutput == "json" {
 		return outputJSON(data)
@@ -22,303 +20,330 @@ func output(data interface{}) error {
 	return outputText(data)
 }
 
-// outputJSON prints data as formatted JSON.
 func outputJSON(data interface{}) error {
 	enc := json.NewEncoder(outputWriter)
 	enc.SetIndent("", "  ")
 	return enc.Encode(data)
 }
 
-// outputText prints data in human-readable text format.
 func outputText(data interface{}) error {
 	switch v := data.(type) {
-	case *openproject.ProjectList:
+	case *openproject.ProjectCollectionModel:
 		return outputProjectList(v)
-	case *openproject.Project:
+	case *openproject.ProjectModel:
 		return outputProject(v)
-	case *openproject.WorkPackageList:
+	case *openproject.WorkPackagesModel:
 		return outputWorkPackageList(v)
-	case *openproject.WorkPackage:
+	case *openproject.WorkPackageModel:
 		return outputWorkPackage(v)
-	case *openproject.UserList:
+	case *openproject.UserCollectionModel:
 		return outputUserList(v)
-	case *openproject.User:
+	case *openproject.UserModel:
 		return outputUser(v)
-	case *openproject.MembershipList:
+	case *openproject.MembershipCollectionModel:
 		return outputMembershipList(v)
-	case *openproject.Membership:
+	case *openproject.MembershipReadModel:
 		return outputMembership(v)
-	case *openproject.TimeEntryList:
+	case *openproject.TimeEntryCollectionModel:
 		return outputTimeEntryList(v)
-	case *openproject.TimeEntry:
+	case *openproject.TimeEntryModel:
 		return outputTimeEntry(v)
-	case *openproject.TimeEntryActivityList:
-		return outputTimeEntryActivityList(v)
-	case *openproject.VersionList:
+	case *openproject.VersionCollectionModel:
 		return outputVersionList(v)
-	case *openproject.Version:
+	case *openproject.VersionReadModel:
 		return outputVersion(v)
-	case *openproject.GridList:
+	case *openproject.GridCollectionModel:
 		return outputGridList(v)
-	case *openproject.Grid:
+	case *openproject.GridReadModel:
 		return outputGrid(v)
-	case *openproject.NotificationList:
+	case *openproject.NotificationCollectionModel:
 		return outputNotificationList(v)
-	case *openproject.Notification:
+	case *openproject.NotificationModel:
 		return outputNotification(v)
-	case *openproject.RelationList:
+	case *openproject.RelationCollectionModel:
 		return outputRelationList(v)
-	case *openproject.Relation:
+	case *openproject.RelationReadModel:
 		return outputRelation(v)
-	case *openproject.StatusList:
+	case *openproject.StatusCollectionModel:
 		return outputStatusList(v)
-	case *openproject.Status:
+	case *openproject.StatusModel:
 		return outputStatus(v)
-	case *openproject.TypeList:
+	case *openproject.TypesByWorkspaceModel:
 		return outputTypeList(v)
-	case *openproject.Type:
+	case *openproject.TypeModel:
 		return outputType(v)
-	case *openproject.PriorityList:
+	case *openproject.PriorityCollectionModel:
 		return outputPriorityList(v)
-	case *openproject.Priority:
+	case *openproject.PriorityModel:
 		return outputPriority(v)
-	case *openproject.RoleList:
-		return outputRoleList(v)
-	case *openproject.Role:
-		return outputRole(v)
-	case *openproject.SearchResults:
-		return outputSearchResults(v)
 	default:
-		// Fallback to JSON for unknown types
 		return outputJSON(data)
 	}
 }
 
-// newTabWriter creates a new tabwriter for aligned output.
 func newTabWriter() *tabwriter.Writer {
 	return tabwriter.NewWriter(outputWriter, 0, 0, 2, ' ', 0)
 }
 
+func dStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func dInt(i *int) int {
+	if i == nil {
+		return 0
+	}
+	return *i
+}
+
+func dBool(b *bool) bool {
+	if b == nil {
+		return false
+	}
+	return *b
+}
+
 // --- Project output ---
 
-func outputProjectList(list *openproject.ProjectList) error {
+func outputProjectList(list *openproject.ProjectCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tIDENTIFIER\tNAME\tACTIVE\tPUBLIC")
-	for _, p := range list.Embedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%t\t%t\n", p.ID, p.Identifier, p.Name, p.Active, p.Public)
+	fmt.Fprintln(w, "ID\tIDENTIFIER\tNAME\tACTIVE\tPUBLIC")
+	for _, p := range list.UnderscoreEmbedded.Elements {
+		fmt.Fprintf(w, "%d\t%s\t%s\t%t\t%t\n", dInt(p.Id), dStr(p.Identifier), dStr(p.Name), dBool(p.Active), dBool(p.Public))
 	}
 	return w.Flush()
 }
 
-func outputProject(p *openproject.Project) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", p.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Identifier: %s\n", p.Identifier)
-	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", p.Name)
-	_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", p.Description.String())
-	_, _ = fmt.Fprintf(outputWriter, "Active: %t\n", p.Active)
-	_, _ = fmt.Fprintf(outputWriter, "Public: %t\n", p.Public)
+func outputProject(p *openproject.ProjectModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", dInt(p.Id))
+	fmt.Fprintf(outputWriter, "Identifier: %s\n", dStr(p.Identifier))
+	fmt.Fprintf(outputWriter, "Name: %s\n", dStr(p.Name))
+	if p.Description != nil && p.Description.Raw != nil {
+		fmt.Fprintf(outputWriter, "Description: %s\n", *p.Description.Raw)
+	}
+	fmt.Fprintf(outputWriter, "Active: %t\n", dBool(p.Active))
+	fmt.Fprintf(outputWriter, "Public: %t\n", dBool(p.Public))
 	if p.CreatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", p.CreatedAt.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(outputWriter, "Created: %s\n", p.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	if p.UpdatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Updated: %s\n", p.UpdatedAt.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(outputWriter, "Updated: %s\n", p.UpdatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
 
 // --- Work Package output ---
 
-func outputWorkPackageList(list *openproject.WorkPackageList) error {
+func outputWorkPackageList(list *openproject.WorkPackagesModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tSUBJECT\tTYPE\tSTATUS\tASSIGNEE\tDUE")
-	for _, wp := range list.Embedded.Elements {
-		assignee := extractAssignee(wp.Links)
-		due := wp.DueDate
-		if due == "" {
-			due = "-"
+	fmt.Fprintln(w, "ID\tSUBJECT\tTYPE\tSTATUS\tASSIGNEE")
+	for _, wp := range list.UnderscoreEmbedded.Elements {
+		assignee := "-"
+		if wp.UnderscoreLinks.Assignee != nil {
+			assignee = dStr(wp.UnderscoreLinks.Assignee.Title)
 		}
-		typeName := extractTypeName(wp.Links)
-		statusName := extractStatusName(wp.Links)
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", wp.ID, truncate(wp.Subject, 40), typeName, statusName, assignee, due)
+		typeName := dStr(wp.UnderscoreLinks.Type.Title)
+		statusName := dStr(wp.UnderscoreLinks.Status.Title)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", dInt(wp.Id), truncate(wp.Subject, 40), typeName, statusName, assignee)
 	}
 	return w.Flush()
 }
 
-func outputWorkPackage(wp *openproject.WorkPackage) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", wp.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Subject: %s\n", wp.Subject)
-	_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", wp.Description.String())
-	_, _ = fmt.Fprintf(outputWriter, "Type: %s\n", extractTypeName(wp.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Status: %s\n", extractStatusName(wp.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Priority: %s\n", extractPriorityName(wp.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Assignee: %s\n", extractAssignee(wp.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Progress: %d%%\n", wp.PercentageDone)
-	if wp.EstimatedTime != "" {
-		_, _ = fmt.Fprintf(outputWriter, "Estimated: %s\n", wp.EstimatedTime)
+func outputWorkPackage(wp *openproject.WorkPackageModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", dInt(wp.Id))
+	fmt.Fprintf(outputWriter, "Subject: %s\n", wp.Subject)
+	if wp.Description != nil && wp.Description.Raw != nil {
+		fmt.Fprintf(outputWriter, "Description: %s\n", *wp.Description.Raw)
 	}
-	if wp.StartDate != "" {
-		_, _ = fmt.Fprintf(outputWriter, "Start: %s\n", wp.StartDate)
+	fmt.Fprintf(outputWriter, "Type: %s\n", dStr(wp.UnderscoreLinks.Type.Title))
+	fmt.Fprintf(outputWriter, "Status: %s\n", dStr(wp.UnderscoreLinks.Status.Title))
+	fmt.Fprintf(outputWriter, "Priority: %s\n", dStr(wp.UnderscoreLinks.Priority.Title))
+	if wp.UnderscoreLinks.Assignee != nil {
+		fmt.Fprintf(outputWriter, "Assignee: %s\n", dStr(wp.UnderscoreLinks.Assignee.Title))
 	}
-	if wp.DueDate != "" {
-		_, _ = fmt.Fprintf(outputWriter, "Due: %s\n", wp.DueDate)
+	if wp.PercentageDone != nil {
+		fmt.Fprintf(outputWriter, "Progress: %d%%\n", *wp.PercentageDone)
+	}
+	if wp.EstimatedTime != nil {
+		fmt.Fprintf(outputWriter, "Estimated: %s\n", *wp.EstimatedTime)
+	}
+	if wp.StartDate != nil {
+		fmt.Fprintf(outputWriter, "Start: %s\n", wp.StartDate.String())
+	}
+	if wp.DueDate != nil {
+		fmt.Fprintf(outputWriter, "Due: %s\n", wp.DueDate.String())
 	}
 	if wp.CreatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", wp.CreatedAt.Format("2006-01-02 15:04:05"))
-	}
-	if wp.UpdatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Updated: %s\n", wp.UpdatedAt.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(outputWriter, "Created: %s\n", wp.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
 
 // --- User output ---
 
-func outputUserList(list *openproject.UserList) error {
+func outputUserList(list *openproject.UserCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tLOGIN\tNAME\tEMAIL\tSTATUS")
-	for _, u := range list.Embedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", u.ID, u.Login, u.Name, u.Email, u.Status)
+	fmt.Fprintln(w, "ID\tNAME\tEMAIL\tSTATUS")
+	for _, u := range list.UnderscoreEmbedded.Elements {
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", u.Id, u.Name, dStr(u.Email), dStr(u.Status))
 	}
 	return w.Flush()
 }
 
-func outputUser(u *openproject.User) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", u.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Login: %s\n", u.Login)
-	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", u.Name)
-	_, _ = fmt.Fprintf(outputWriter, "Email: %s\n", u.Email)
-	_, _ = fmt.Fprintf(outputWriter, "Admin: %t\n", u.Admin)
-	_, _ = fmt.Fprintf(outputWriter, "Status: %s\n", u.Status)
-	_, _ = fmt.Fprintf(outputWriter, "Language: %s\n", u.Language)
+func outputUser(u *openproject.UserModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", u.Id)
+	fmt.Fprintf(outputWriter, "Name: %s\n", u.Name)
+	if u.Login != nil {
+		fmt.Fprintf(outputWriter, "Login: %s\n", *u.Login)
+	}
+	if u.Email != nil {
+		fmt.Fprintf(outputWriter, "Email: %s\n", *u.Email)
+	}
+	if u.Admin != nil {
+		fmt.Fprintf(outputWriter, "Admin: %t\n", *u.Admin)
+	}
+	if u.Status != nil {
+		fmt.Fprintf(outputWriter, "Status: %s\n", *u.Status)
+	}
+	if u.Language != nil {
+		fmt.Fprintf(outputWriter, "Language: %s\n", *u.Language)
+	}
 	if u.CreatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", u.CreatedAt.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(outputWriter, "Created: %s\n", u.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
 
 // --- Membership output ---
 
-func outputMembershipList(list *openproject.MembershipList) error {
+func outputMembershipList(list *openproject.MembershipCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tPROJECT\tUSER\tROLES")
-	for _, m := range list.Embedded.Elements {
-		project := extractProjectName(m.Links)
-		user := extractPrincipalName(m.Links)
-		roles := extractRoleNames(m.Links)
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", m.ID, project, user, roles)
+	fmt.Fprintln(w, "ID\tROLES")
+	for _, m := range list.UnderscoreEmbedded.Elements {
+		roles := "-"
+		if len(m.UnderscoreLinks.Roles) > 0 {
+			names := make([]string, len(m.UnderscoreLinks.Roles))
+			for i, r := range m.UnderscoreLinks.Roles {
+				names[i] = dStr(r.Title)
+			}
+			roles = strings.Join(names, ", ")
+		}
+		fmt.Fprintf(w, "%d\t%s\n", m.Id, roles)
 	}
 	return w.Flush()
 }
 
-func outputMembership(m *openproject.Membership) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", m.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Project: %s\n", extractProjectName(m.Links))
-	_, _ = fmt.Fprintf(outputWriter, "User: %s\n", extractPrincipalName(m.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Roles: %s\n", extractRoleNames(m.Links))
-	if m.CreatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", m.CreatedAt.Format("2006-01-02 15:04:05"))
+func outputMembership(m *openproject.MembershipReadModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", m.Id)
+	roles := "-"
+	if len(m.UnderscoreLinks.Roles) > 0 {
+		names := make([]string, len(m.UnderscoreLinks.Roles))
+		for i, r := range m.UnderscoreLinks.Roles {
+			names[i] = dStr(r.Title)
+		}
+		roles = strings.Join(names, ", ")
 	}
+	fmt.Fprintf(outputWriter, "Roles: %s\n", roles)
+	fmt.Fprintf(outputWriter, "Created: %s\n", m.CreatedAt.Format("2006-01-02 15:04:05"))
 	return nil
 }
 
 // --- Time Entry output ---
 
-func outputTimeEntryList(list *openproject.TimeEntryList) error {
+func outputTimeEntryList(list *openproject.TimeEntryCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tDATE\tHOURS\tUSER\tPROJECT\tCOMMENT")
-	for _, t := range list.Embedded.Elements {
-		user := extractTimeEntryUser(t.Links)
-		project := extractTimeEntryProject(t.Links)
-		comment := truncate(t.Comment, 30)
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", t.ID, t.SpentOn, t.Hours, user, project, comment)
+	fmt.Fprintln(w, "ID\tDATE\tHOURS\tCOMMENT")
+	for _, t := range list.UnderscoreEmbedded.Elements {
+		comment := ""
+		if t.Comment != nil && t.Comment.Raw != nil {
+			comment = truncate(*t.Comment.Raw, 30)
+		}
+		spentOn := "-"
+		if t.SpentOn != nil {
+			spentOn = t.SpentOn.String()
+		}
+		hours := "-"
+		if t.Hours != nil {
+			hours = *t.Hours
+		}
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", dInt(t.Id), spentOn, hours, comment)
 	}
 	return w.Flush()
 }
 
-func outputTimeEntry(t *openproject.TimeEntry) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", t.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Date: %s\n", t.SpentOn)
-	_, _ = fmt.Fprintf(outputWriter, "Hours: %s\n", t.Hours)
-	_, _ = fmt.Fprintf(outputWriter, "User: %s\n", extractTimeEntryUser(t.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Project: %s\n", extractTimeEntryProject(t.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Work Package: %s\n", extractTimeEntryWorkPackage(t.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Activity: %s\n", extractTimeEntryActivity(t.Links))
-	_, _ = fmt.Fprintf(outputWriter, "Comment: %s\n", t.Comment)
+func outputTimeEntry(t *openproject.TimeEntryModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", dInt(t.Id))
+	if t.SpentOn != nil {
+		fmt.Fprintf(outputWriter, "Date: %s\n", t.SpentOn.String())
+	}
+	if t.Hours != nil {
+		fmt.Fprintf(outputWriter, "Hours: %s\n", *t.Hours)
+	}
+	if t.Comment != nil && t.Comment.Raw != nil {
+		fmt.Fprintf(outputWriter, "Comment: %s\n", *t.Comment.Raw)
+	}
 	if t.CreatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", t.CreatedAt.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(outputWriter, "Created: %s\n", t.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
 
-func outputTimeEntryActivityList(list *openproject.TimeEntryActivityList) error {
-	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tACTIVE")
-	for _, a := range list.Embedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%t\t%t\n", a.ID, a.Name, a.IsDefault, a.Active)
-	}
-	return w.Flush()
-}
-
 // --- Version output ---
 
-func outputVersionList(list *openproject.VersionList) error {
+func outputVersionList(list *openproject.VersionCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tNAME\tSTATUS\tSTART\tEND")
-	for _, v := range list.Embedded.Elements {
-		start := v.StartDate
-		if start == "" {
-			start = "-"
+	fmt.Fprintln(w, "ID\tNAME\tSTATUS\tSTART\tEND")
+	for _, v := range list.UnderscoreEmbedded.Elements {
+		start := "-"
+		if v.StartDate != nil {
+			start = v.StartDate.String()
 		}
-		end := v.EndDate
-		if end == "" {
-			end = "-"
+		end := "-"
+		if v.EndDate != nil {
+			end = v.EndDate.String()
 		}
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", v.ID, v.Name, v.Status, start, end)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", v.Id, v.Name, v.Status, start, end)
 	}
 	return w.Flush()
 }
 
-func outputVersion(v *openproject.Version) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", v.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", v.Name)
-	_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", v.Description)
-	_, _ = fmt.Fprintf(outputWriter, "Status: %s\n", v.Status)
-	if v.StartDate != "" {
-		_, _ = fmt.Fprintf(outputWriter, "Start: %s\n", v.StartDate)
+func outputVersion(v *openproject.VersionReadModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", v.Id)
+	fmt.Fprintf(outputWriter, "Name: %s\n", v.Name)
+	fmt.Fprintf(outputWriter, "Status: %s\n", v.Status)
+	if v.StartDate != nil {
+		fmt.Fprintf(outputWriter, "Start: %s\n", v.StartDate.String())
 	}
-	if v.EndDate != "" {
-		_, _ = fmt.Fprintf(outputWriter, "End: %s\n", v.EndDate)
+	if v.EndDate != nil {
+		fmt.Fprintf(outputWriter, "End: %s\n", v.EndDate.String())
 	}
-	if v.CreatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", v.CreatedAt.Format("2006-01-02 15:04:05"))
-	}
+	fmt.Fprintf(outputWriter, "Created: %s\n", v.CreatedAt.Format("2006-01-02 15:04:05"))
 	return nil
 }
 
 // --- Grid/Board output ---
 
-func outputGridList(list *openproject.GridList) error {
+func outputGridList(list *openproject.GridCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tROWS\tCOLS\tWIDGETS")
-	for _, g := range list.Embedded.Elements {
-		widgets := 0
-		if g.Embedded != nil {
-			widgets = len(g.Embedded.Widgets)
-		}
-		_, _ = fmt.Fprintf(w, "%d\t%d\t%d\t%d\n", g.ID, g.RowCount, g.ColumnCount, widgets)
+	fmt.Fprintln(w, "ID\tROWS\tCOLS\tWIDGETS")
+	for _, g := range list.UnderscoreEmbedded.Elements {
+		fmt.Fprintf(w, "%d\t%d\t%d\t%d\n", g.Id, g.RowCount, g.ColumnCount, len(g.Widgets))
 	}
 	return w.Flush()
 }
 
-func outputGrid(g *openproject.Grid) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", g.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Rows: %d\n", g.RowCount)
-	_, _ = fmt.Fprintf(outputWriter, "Columns: %d\n", g.ColumnCount)
-	if g.Embedded != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Widgets:\n")
-		for _, w := range g.Embedded.Widgets {
-			_, _ = fmt.Fprintf(outputWriter, "  - ID: %d, Type: %s, Position: (%d,%d) to (%d,%d)\n",
-				w.ID, w.Identifier, w.StartRow, w.StartColumn, w.EndRow, w.EndColumn)
+func outputGrid(g *openproject.GridReadModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", g.Id)
+	fmt.Fprintf(outputWriter, "Rows: %d\n", g.RowCount)
+	fmt.Fprintf(outputWriter, "Columns: %d\n", g.ColumnCount)
+	if len(g.Widgets) > 0 {
+		fmt.Fprintf(outputWriter, "Widgets:\n")
+		for _, w := range g.Widgets {
+			fmt.Fprintf(outputWriter, "  - ID: %d, Type: %s, Position: (%d,%d) to (%d,%d)\n",
+				dInt(w.Id), w.Identifier, w.StartRow, w.StartColumn, w.EndRow, w.EndColumn)
 		}
 	}
 	return nil
@@ -326,10 +351,10 @@ func outputGrid(g *openproject.Grid) error {
 
 // --- Notification output ---
 
-func outputNotificationList(list *openproject.NotificationList) error {
+func outputNotificationList(list *openproject.NotificationCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tREASON\tREAD\tCREATED")
-	for _, n := range list.Embedded.Elements {
+	fmt.Fprintln(w, "ID\tREASON\tREAD\tCREATED")
+	for _, n := range list.UnderscoreEmbedded.Elements {
 		read := "No"
 		if n.ReadIAN != nil && *n.ReadIAN {
 			read = "Yes"
@@ -338,264 +363,158 @@ func outputNotificationList(list *openproject.NotificationList) error {
 		if n.CreatedAt != nil {
 			created = n.CreatedAt.Format("2006-01-02 15:04")
 		}
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", n.ID, n.Reason, read, created)
+		reason := "-"
+		if n.Reason != nil {
+			reason = string(*n.Reason)
+		}
+		id := 0
+		if n.Id != nil {
+			id = *n.Id
+		}
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", id, reason, read, created)
 	}
 	return w.Flush()
 }
 
-func outputNotification(n *openproject.Notification) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", n.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Reason: %s\n", n.Reason)
+func outputNotification(n *openproject.NotificationModel) error {
+	if n.Id != nil {
+		fmt.Fprintf(outputWriter, "ID: %d\n", *n.Id)
+	}
+	if n.Reason != nil {
+		fmt.Fprintf(outputWriter, "Reason: %s\n", *n.Reason)
+	}
 	read := "No"
 	if n.ReadIAN != nil && *n.ReadIAN {
 		read = "Yes"
 	}
-	_, _ = fmt.Fprintf(outputWriter, "Read: %s\n", read)
+	fmt.Fprintf(outputWriter, "Read: %s\n", read)
 	if n.CreatedAt != nil {
-		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", n.CreatedAt.Format("2006-01-02 15:04:05"))
-	}
-	if n.Links != nil {
-		if n.Links.Actor != nil {
-			_, _ = fmt.Fprintf(outputWriter, "Actor: %s\n", n.Links.Actor.Title)
-		}
-		if n.Links.Project != nil {
-			_, _ = fmt.Fprintf(outputWriter, "Project: %s\n", n.Links.Project.Title)
-		}
+		fmt.Fprintf(outputWriter, "Created: %s\n", n.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
 }
 
 // --- Relation output ---
 
-func outputRelationList(list *openproject.RelationList) error {
+func outputRelationList(list *openproject.RelationCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tTYPE\tFROM\tTO\tDELAY")
-	for _, r := range list.Embedded.Elements {
-		from := extractRelationFrom(r.Links)
-		to := extractRelationTo(r.Links)
+	fmt.Fprintln(w, "ID\tTYPE\tDELAY")
+	for _, r := range list.UnderscoreEmbedded.Elements {
 		delay := "-"
-		if r.Delay > 0 {
-			delay = fmt.Sprintf("%d days", r.Delay)
+		if r.Lag != nil && *r.Lag > 0 {
+			delay = fmt.Sprintf("%d days", *r.Lag)
 		}
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", r.ID, r.Type, from, to, delay)
+		rType := "-"
+		if r.Type != nil {
+			rType = string(*r.Type)
+		}
+		fmt.Fprintf(w, "%d\t%s\t%s\n", dInt(r.Id), rType, delay)
 	}
 	return w.Flush()
 }
 
-func outputRelation(r *openproject.Relation) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", r.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Type: %s\n", r.Type)
-	_, _ = fmt.Fprintf(outputWriter, "From: %s\n", extractRelationFrom(r.Links))
-	_, _ = fmt.Fprintf(outputWriter, "To: %s\n", extractRelationTo(r.Links))
-	if r.Description != "" {
-		_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", r.Description)
+func outputRelation(r *openproject.RelationReadModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", dInt(r.Id))
+	if r.Type != nil {
+		fmt.Fprintf(outputWriter, "Type: %s\n", *r.Type)
 	}
-	if r.Delay > 0 {
-		_, _ = fmt.Fprintf(outputWriter, "Delay: %d days\n", r.Delay)
+	if r.Description != nil {
+		fmt.Fprintf(outputWriter, "Description: %s\n", *r.Description)
+	}
+	if r.Lag != nil && *r.Lag > 0 {
+		fmt.Fprintf(outputWriter, "Delay: %d days\n", *r.Lag)
 	}
 	return nil
 }
 
 // --- Status output ---
 
-func outputStatusList(list *openproject.StatusList) error {
+func outputStatusList(list *openproject.StatusCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tCLOSED\tREADONLY")
-	for _, s := range list.Embedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%t\t%t\t%t\n", s.ID, s.Name, s.IsDefault, s.IsClosed, s.IsReadonly)
+	fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tCLOSED\tREADONLY")
+	for _, s := range list.UnderscoreEmbedded.Elements {
+		fmt.Fprintf(w, "%d\t%s\t%t\t%t\t%t\n", dInt(s.Id), dStr(s.Name), dBool(s.IsDefault), dBool(s.IsClosed), dBool(s.IsReadonly))
 	}
 	return w.Flush()
 }
 
-func outputStatus(s *openproject.Status) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", s.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", s.Name)
-	_, _ = fmt.Fprintf(outputWriter, "Position: %d\n", s.Position)
-	_, _ = fmt.Fprintf(outputWriter, "Default: %t\n", s.IsDefault)
-	_, _ = fmt.Fprintf(outputWriter, "Closed: %t\n", s.IsClosed)
-	_, _ = fmt.Fprintf(outputWriter, "Readonly: %t\n", s.IsReadonly)
-	if s.Color != "" {
-		_, _ = fmt.Fprintf(outputWriter, "Color: %s\n", s.Color)
+func outputStatus(s *openproject.StatusModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", dInt(s.Id))
+	fmt.Fprintf(outputWriter, "Name: %s\n", dStr(s.Name))
+	if s.Position != nil {
+		fmt.Fprintf(outputWriter, "Position: %d\n", *s.Position)
+	}
+	fmt.Fprintf(outputWriter, "Default: %t\n", dBool(s.IsDefault))
+	fmt.Fprintf(outputWriter, "Closed: %t\n", dBool(s.IsClosed))
+	fmt.Fprintf(outputWriter, "Readonly: %t\n", dBool(s.IsReadonly))
+	if s.Color != nil {
+		fmt.Fprintf(outputWriter, "Color: %s\n", *s.Color)
 	}
 	return nil
 }
 
 // --- Type output ---
 
-func outputTypeList(list *openproject.TypeList) error {
+func outputTypeList(list *openproject.TypesByWorkspaceModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tMILESTONE")
-	for _, t := range list.Embedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%t\t%t\n", t.ID, t.Name, t.IsDefault, t.IsMilestone)
+	fmt.Fprintln(w, "ID\tNAME\tDEFAULT\tMILESTONE")
+	if list.UnderscoreEmbedded.Elements != nil {
+		for _, t := range *list.UnderscoreEmbedded.Elements {
+			fmt.Fprintf(w, "%d\t%s\t%t\t%t\n", dInt(t.Id), dStr(t.Name), dBool(t.IsDefault), dBool(t.IsMilestone))
+		}
 	}
 	return w.Flush()
 }
 
-func outputType(t *openproject.Type) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", t.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", t.Name)
-	_, _ = fmt.Fprintf(outputWriter, "Position: %d\n", t.Position)
-	_, _ = fmt.Fprintf(outputWriter, "Default: %t\n", t.IsDefault)
-	_, _ = fmt.Fprintf(outputWriter, "Milestone: %t\n", t.IsMilestone)
-	if t.Color != "" {
-		_, _ = fmt.Fprintf(outputWriter, "Color: %s\n", t.Color)
+func outputType(t *openproject.TypeModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", dInt(t.Id))
+	fmt.Fprintf(outputWriter, "Name: %s\n", dStr(t.Name))
+	if t.Position != nil {
+		fmt.Fprintf(outputWriter, "Position: %d\n", *t.Position)
+	}
+	fmt.Fprintf(outputWriter, "Default: %t\n", dBool(t.IsDefault))
+	fmt.Fprintf(outputWriter, "Milestone: %t\n", dBool(t.IsMilestone))
+	if t.Color != nil {
+		fmt.Fprintf(outputWriter, "Color: %s\n", *t.Color)
 	}
 	return nil
 }
 
 // --- Priority output ---
 
-func outputPriorityList(list *openproject.PriorityList) error {
+func outputPriorityList(list *openproject.PriorityCollectionModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tNAME\tDEFAULT")
-	for _, p := range list.Embedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%t\n", p.ID, p.Name, p.IsDefault)
+	fmt.Fprintln(w, "ID\tNAME\tDEFAULT")
+	for _, p := range list.UnderscoreEmbedded.Elements {
+		fmt.Fprintf(w, "%d\t%s\t%t\n", dInt(p.Id), dStr(p.Name), dBool(p.IsDefault))
 	}
 	return w.Flush()
 }
 
-func outputPriority(p *openproject.Priority) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", p.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", p.Name)
-	_, _ = fmt.Fprintf(outputWriter, "Position: %d\n", p.Position)
-	_, _ = fmt.Fprintf(outputWriter, "Default: %t\n", p.IsDefault)
-	if p.Color != "" {
-		_, _ = fmt.Fprintf(outputWriter, "Color: %s\n", p.Color)
+func outputPriority(p *openproject.PriorityModel) error {
+	fmt.Fprintf(outputWriter, "ID: %d\n", dInt(p.Id))
+	fmt.Fprintf(outputWriter, "Name: %s\n", dStr(p.Name))
+	if p.Position != nil {
+		fmt.Fprintf(outputWriter, "Position: %d\n", *p.Position)
 	}
+	fmt.Fprintf(outputWriter, "Default: %t\n", dBool(p.IsDefault))
 	return nil
 }
 
 // --- Role output ---
 
-func outputRoleList(list *openproject.RoleList) error {
+func outputRoleList(roles []openproject.RoleModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tNAME")
-	for _, r := range list.Embedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%s\n", r.ID, r.Name)
+	fmt.Fprintln(w, "ID\tNAME")
+	for _, r := range roles {
+		fmt.Fprintf(w, "%d\t%s\n", dInt(r.Id), r.Name)
 	}
 	return w.Flush()
 }
-
-func outputRole(r *openproject.Role) error {
-	_, _ = fmt.Fprintf(outputWriter, "ID: %d\n", r.ID)
-	_, _ = fmt.Fprintf(outputWriter, "Name: %s\n", r.Name)
-	if len(r.Permissions) > 0 {
-		_, _ = fmt.Fprintf(outputWriter, "Permissions: %s\n", strings.Join(r.Permissions, ", "))
-	}
-	return nil
-}
-
-// --- Search output ---
-
-func outputSearchResults(results *openproject.SearchResults) error {
-	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tTYPE\tTITLE")
-	for _, r := range results.Embedded.Elements {
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\n", r.ID, r.Type, r.Title)
-	}
-	return w.Flush()
-}
-
-// --- Helper functions ---
 
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
 	return s[:maxLen-3] + "..."
-}
-
-func extractAssignee(links *openproject.WorkPackageLinks) string {
-	if links == nil || links.Assignee == nil {
-		return "-"
-	}
-	return links.Assignee.Title
-}
-
-func extractTypeName(links *openproject.WorkPackageLinks) string {
-	if links == nil || links.Type == nil {
-		return "-"
-	}
-	return links.Type.Title
-}
-
-func extractStatusName(links *openproject.WorkPackageLinks) string {
-	if links == nil || links.Status == nil {
-		return "-"
-	}
-	return links.Status.Title
-}
-
-func extractPriorityName(links *openproject.WorkPackageLinks) string {
-	if links == nil || links.Priority == nil {
-		return "-"
-	}
-	return links.Priority.Title
-}
-
-func extractProjectName(links *openproject.MembershipLinks) string {
-	if links == nil || links.Project == nil {
-		return "-"
-	}
-	return links.Project.Title
-}
-
-func extractPrincipalName(links *openproject.MembershipLinks) string {
-	if links == nil || links.Principal == nil {
-		return "-"
-	}
-	return links.Principal.Title
-}
-
-func extractRoleNames(links *openproject.MembershipLinks) string {
-	if links == nil || len(links.Roles) == 0 {
-		return "-"
-	}
-	names := make([]string, len(links.Roles))
-	for i, r := range links.Roles {
-		names[i] = r.Title
-	}
-	return strings.Join(names, ", ")
-}
-
-func extractTimeEntryUser(links *openproject.TimeEntryLinks) string {
-	if links == nil || links.User == nil {
-		return "-"
-	}
-	return links.User.Title
-}
-
-func extractTimeEntryProject(links *openproject.TimeEntryLinks) string {
-	if links == nil || links.Project == nil {
-		return "-"
-	}
-	return links.Project.Title
-}
-
-func extractTimeEntryWorkPackage(links *openproject.TimeEntryLinks) string {
-	if links == nil || links.WorkPackage == nil {
-		return "-"
-	}
-	return links.WorkPackage.Title
-}
-
-func extractTimeEntryActivity(links *openproject.TimeEntryLinks) string {
-	if links == nil || links.Activity == nil {
-		return "-"
-	}
-	return links.Activity.Title
-}
-
-func extractRelationFrom(links *openproject.RelationLinks) string {
-	if links == nil || links.From == nil {
-		return "-"
-	}
-	return links.From.Title
-}
-
-func extractRelationTo(links *openproject.RelationLinks) string {
-	if links == nil || links.To == nil {
-		return "-"
-	}
-	return links.To.Title
 }

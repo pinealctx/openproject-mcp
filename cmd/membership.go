@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -64,21 +65,23 @@ var membershipListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List memberships",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		api := getClient().APIClient()
+		params := &openproject.ListMembershipsParams{}
+
 		if membershipListProjectID > 0 {
-			list, err := getClient().ListProjectMemberships(getContext(), membershipListProjectID)
-			if err != nil {
-				return err
-			}
-			return output(list)
+			filter := fmt.Sprintf(`[{"project":{"operator":"=","values":["%d"]}}]`, membershipListProjectID)
+			params.Filters = ptr(filter)
 		}
-		opts := &openproject.ListMembershipsOptions{
-			PageSize: membershipListPageSize,
-		}
-		list, err := getClient().ListMemberships(getContext(), opts)
+
+		resp, err := api.ListMemberships(getContext(), params)
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var result openproject.MembershipCollectionModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -91,11 +94,16 @@ var membershipGetCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid membership ID: %s", args[0])
 		}
-		membership, err := getClient().GetMembership(getContext(), id)
+		api := getClient().APIClient()
+		resp, err := api.GetMembership(getContext(), id)
 		if err != nil {
 			return err
 		}
-		return output(membership)
+		var result openproject.MembershipReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -104,16 +112,26 @@ var membershipCreateCmd = &cobra.Command{
 	Short: "Add user to project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		roleIDs := parseRoleIDs(membershipCreateRoles)
-		opts := &openproject.CreateMembershipOptions{
-			ProjectID: membershipCreateProjectID,
-			Principal: membershipCreateUserID,
-			RoleIDs:   roleIDs,
+		roleLinks := make([]external.Link, len(roleIDs))
+		for i, rid := range roleIDs {
+			roleLinks[i] = external.Link{Href: ptr(fmt.Sprintf("/api/v3/roles/%d", rid))}
 		}
-		membership, err := getClient().CreateMembership(getContext(), opts)
+
+		body := external.MembershipWriteModel{}
+		body.UnderscoreLinks.Principal = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/users/%d", membershipCreateUserID))}
+		body.UnderscoreLinks.Project = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/projects/%d", membershipCreateProjectID))}
+		body.UnderscoreLinks.Roles = &roleLinks
+
+		api := getClient().APIClient()
+		resp, err := api.CreateMembership(getContext(), body)
 		if err != nil {
 			return err
 		}
-		return output(membership)
+		var result openproject.MembershipReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -127,14 +145,24 @@ var membershipUpdateCmd = &cobra.Command{
 			return fmt.Errorf("invalid membership ID: %s", args[0])
 		}
 		roleIDs := parseRoleIDs(membershipUpdateRoles)
-		opts := &openproject.UpdateMembershipOptions{
-			RoleIDs: roleIDs,
+		roleLinks := make([]external.Link, len(roleIDs))
+		for i, rid := range roleIDs {
+			roleLinks[i] = external.Link{Href: ptr(fmt.Sprintf("/api/v3/roles/%d", rid))}
 		}
-		membership, err := getClient().UpdateMembership(getContext(), id, opts)
+
+		body := external.MembershipWriteModel{}
+		body.UnderscoreLinks.Roles = &roleLinks
+
+		api := getClient().APIClient()
+		resp, err := api.UpdateMembership(getContext(), id, body)
 		if err != nil {
 			return err
 		}
-		return output(membership)
+		var result openproject.MembershipReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -147,7 +175,12 @@ var membershipDeleteCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid membership ID: %s", args[0])
 		}
-		if err := getClient().DeleteMembership(getContext(), id); err != nil {
+		api := getClient().APIClient()
+		resp, err := api.DeleteMembership(getContext(), id)
+		if err != nil {
+			return err
+		}
+		if err := openproject.ReadResponse(resp, nil); err != nil {
 			return err
 		}
 		fmt.Println("Membership removed successfully")

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -75,17 +76,25 @@ var boardListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List boards",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := &openproject.ListGridsOptions{
-			PageSize: boardListPageSize,
+		api := getClient().APIClient()
+		params := &openproject.ListGridsParams{}
+		if boardListPageSize > 0 {
+			params.PageSize = ptr(boardListPageSize)
 		}
 		if boardListProjectID > 0 {
-			opts.Filters = fmt.Sprintf(`[{"scope":{"operator":"=","values":["/api/v3/projects/%d"]}}]`, boardListProjectID)
+			filter := fmt.Sprintf(`[{"page":{"operator":"=","values":["/api/v3/projects/%d"]}}]`, boardListProjectID)
+			params.Filters = ptr(filter)
 		}
-		list, err := getClient().ListGrids(getContext(), opts)
+
+		resp, err := api.ListGrids(getContext(), params)
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var result openproject.GridCollectionModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -98,11 +107,16 @@ var boardGetCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid board ID: %s", args[0])
 		}
-		grid, err := getClient().GetGrid(getContext(), id)
+		api := getClient().APIClient()
+		resp, err := api.GetGrid(getContext(), id)
 		if err != nil {
 			return err
 		}
-		return output(grid)
+		var result openproject.GridReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -110,15 +124,27 @@ var boardCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new board",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := &openproject.CreateGridOptions{
-			RowCount:    boardCreateRowCount,
-			ColumnCount: boardCreateColumnCount,
+		body := external.GridWriteModel{
+			RowCount:    ptr(boardCreateRowCount),
+			ColumnCount: ptr(boardCreateColumnCount),
 		}
-		grid, err := getClient().CreateGrid(getContext(), boardCreateProjectID, opts)
+		// Set scope link to project
+		body.UnderscoreLinks = &struct {
+			Scope *external.Link `json:"scope,omitempty"`
+		}{
+			Scope: &external.Link{Href: ptr(fmt.Sprintf("/api/v3/projects/%d", boardCreateProjectID))},
+		}
+
+		api := getClient().APIClient()
+		resp, err := api.CreateGrid(getContext(), body)
 		if err != nil {
 			return err
 		}
-		return output(grid)
+		var result openproject.GridReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -131,18 +157,24 @@ var boardUpdateCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid board ID: %s", args[0])
 		}
-		opts := &openproject.UpdateGridOptions{}
+		body := external.GridWriteModel{}
 		if cmd.Flags().Changed("rows") {
-			opts.RowCount = boardUpdateRowCount
+			body.RowCount = ptr(boardUpdateRowCount)
 		}
 		if cmd.Flags().Changed("columns") {
-			opts.ColumnCount = boardUpdateColumnCount
+			body.ColumnCount = ptr(boardUpdateColumnCount)
 		}
-		grid, err := getClient().UpdateGrid(getContext(), id, opts)
+
+		api := getClient().APIClient()
+		resp, err := api.UpdateGrid(getContext(), id, body)
 		if err != nil {
 			return err
 		}
-		return output(grid)
+		var result openproject.GridReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -155,7 +187,8 @@ var boardDeleteCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid board ID: %s", args[0])
 		}
-		if err := getClient().DeleteGrid(getContext(), id); err != nil {
+		// No DeleteGrid method in generated client, use raw DELETE
+		if err := getClient().Delete(getContext(), fmt.Sprintf("/grids/%d", id)); err != nil {
 			return err
 		}
 		fmt.Println("Board deleted successfully")
@@ -178,23 +211,44 @@ var boardWidgetAddCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid board ID: %s", args[0])
 		}
-		widget := openproject.GridWidget{
+
+		// First get the current grid to preserve existing widgets
+		api := getClient().APIClient()
+		resp, err := api.GetGrid(getContext(), boardID)
+		if err != nil {
+			return err
+		}
+		var grid openproject.GridReadModel
+		if err := openproject.ReadResponse(resp, &grid); err != nil {
+			return err
+		}
+
+		// Build new widget
+		newWidget := external.GridWidgetModel{
 			Identifier:  boardWidgetIdentifier,
 			StartRow:    boardWidgetStartRow,
 			EndRow:      boardWidgetEndRow,
 			StartColumn: boardWidgetStartCol,
 			EndColumn:   boardWidgetEndCol,
 		}
-		if boardWidgetQueryID > 0 && widget.Links == nil {
-			widget.Links = &openproject.GridWidgetLinks{
-				Query: &openproject.Link{Href: fmt.Sprintf("/api/v3/queries/%d", boardWidgetQueryID)},
-			}
+
+		// Append widget and update grid
+		widgets := append(grid.Widgets, newWidget)
+		body := external.GridWriteModel{
+			RowCount:    ptr(grid.RowCount),
+			ColumnCount: ptr(grid.ColumnCount),
+			Widgets:     &widgets,
 		}
-		grid, err := getClient().AddGridWidget(getContext(), boardID, widget)
+
+		resp, err = api.UpdateGrid(getContext(), boardID, body)
 		if err != nil {
 			return err
 		}
-		return output(grid)
+		var result openproject.GridReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -211,11 +265,41 @@ var boardWidgetRemoveCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid widget ID: %s", args[1])
 		}
-		grid, err := getClient().RemoveGridWidget(getContext(), boardID, widgetID)
+
+		// First get the current grid
+		api := getClient().APIClient()
+		resp, err := api.GetGrid(getContext(), boardID)
 		if err != nil {
 			return err
 		}
-		return output(grid)
+		var grid openproject.GridReadModel
+		if err := openproject.ReadResponse(resp, &grid); err != nil {
+			return err
+		}
+
+		// Filter out the widget with the given ID
+		var widgets []external.GridWidgetModel
+		for _, w := range grid.Widgets {
+			if w.Id == nil || *w.Id != widgetID {
+				widgets = append(widgets, w)
+			}
+		}
+
+		body := external.GridWriteModel{
+			RowCount:    ptr(grid.RowCount),
+			ColumnCount: ptr(grid.ColumnCount),
+			Widgets:     &widgets,
+		}
+
+		resp, err = api.UpdateGrid(getContext(), boardID, body)
+		if err != nil {
+			return err
+		}
+		var result openproject.GridReadModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 

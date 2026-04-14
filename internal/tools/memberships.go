@@ -7,6 +7,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 type ListMembershipsArgs struct {
@@ -78,170 +79,241 @@ func (r *Registry) registerMembershipTools(server *mcp.Server) {
 func (r *Registry) listMemberships(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListMembershipsArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.ListMembershipsOptions{Offset: args.Offset, PageSize: args.PageSize}
-	var list *openproject.MembershipList
-	var err error
+	params := &external.ListMembershipsParams{}
 	if args.ProjectID > 0 {
-		list, err = r.client.ListProjectMemberships(ctx, args.ProjectID)
-	} else {
-		list, err = r.client.ListMemberships(ctx, opts)
+		params.Filters = strPtr(fmt.Sprintf(`[{"project":{"operator":"=","values":["%d"]}}]`, args.ProjectID))
 	}
+
+	resp, err := r.client.APIClient().ListMemberships(ctx, params)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list memberships: %v", err)}}}, nil
+		return errorResult("Failed to list memberships: %v", err), nil
+	}
+
+	var list external.MembershipCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list memberships: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d memberships:\n\n", list.Total)
-	for _, m := range list.Embedded.Elements {
+	for _, m := range list.UnderscoreEmbedded.Elements {
 		principal := "Unknown"
-		if m.Links != nil && m.Links.Principal != nil {
-			principal = m.Links.Principal.Title
+		if m.UnderscoreLinks.Principal.Title != nil {
+			principal = *m.UnderscoreLinks.Principal.Title
 		}
 		roles := []string{}
-		if m.Links != nil {
-			for _, r := range m.Links.Roles {
-				if r != nil {
-					roles = append(roles, r.Title)
-				}
+		for _, rl := range m.UnderscoreLinks.Roles {
+			if rl.Title != nil {
+				roles = append(roles, *rl.Title)
 			}
 		}
 		rolesStr := strings.Join(roles, ", ")
 		if rolesStr == "" {
 			rolesStr = "No roles"
 		}
-		result += fmt.Sprintf("- #%d **%s** — Roles: %s\n", m.ID, principal, rolesStr)
+		result += fmt.Sprintf("- #%d **%s** — Roles: %s\n", m.Id, principal, rolesStr)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) getMembership(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args GetMembershipArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	m, err := r.client.GetMembership(ctx, args.ID)
+	resp, err := r.client.APIClient().GetMembership(ctx, args.ID)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to get membership: %v", err)}}}, nil
+		return errorResult("Failed to get membership: %v", err), nil
+	}
+	var m external.MembershipReadModel
+	if err := openproject.ReadResponse(resp, &m); err != nil {
+		return errorResult("Failed to get membership: %v", err), nil
 	}
 
 	principal, project := "Unknown", "Unknown"
-	if m.Links != nil {
-		if m.Links.Principal != nil {
-			principal = m.Links.Principal.Title
-		}
-		if m.Links.Project != nil {
-			project = m.Links.Project.Title
-		}
+	if m.UnderscoreLinks.Principal.Title != nil {
+		principal = *m.UnderscoreLinks.Principal.Title
+	}
+	if m.UnderscoreLinks.Project.Title != nil {
+		project = *m.UnderscoreLinks.Project.Title
 	}
 	roles := []string{}
-	if m.Links != nil {
-		for _, role := range m.Links.Roles {
-			if role != nil {
-				roles = append(roles, role.Title)
-			}
+	for _, role := range m.UnderscoreLinks.Roles {
+		if role.Title != nil {
+			roles = append(roles, *role.Title)
 		}
 	}
 
-	result := fmt.Sprintf("# Membership #%d\n\n", m.ID)
+	result := fmt.Sprintf("# Membership #%d\n\n", m.Id)
 	result += fmt.Sprintf("- **Principal:** %s\n", principal)
 	result += fmt.Sprintf("- **Project:** %s\n", project)
 	result += fmt.Sprintf("- **Roles:** %s\n", strings.Join(roles, ", "))
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) createMembership(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args CreateMembershipArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.CreateMembershipOptions{ProjectID: args.ProjectID, Principal: args.Principal, RoleIDs: args.RoleIDs}
-	m, err := r.client.CreateMembership(ctx, opts)
-	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to create membership: %v", err)}}}, nil
+	roleLinks := make([]external.Link, len(args.RoleIDs))
+	for i, rid := range args.RoleIDs {
+		roleLinks[i] = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/roles/%d", rid))}
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Membership #%d created successfully!", m.ID)}}}, nil
+
+	body := external.MembershipWriteModel{
+		UnderscoreLinks: struct {
+			Principal *external.Link   `json:"principal,omitempty"`
+			Project   *external.Link   `json:"project,omitempty"`
+			Roles     *[]external.Link `json:"roles,omitempty"`
+		}{
+			Principal: &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/users/%d", args.Principal))},
+			Project:   &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/projects/%d", args.ProjectID))},
+			Roles:     &roleLinks,
+		},
+	}
+
+	resp, err := r.client.APIClient().CreateMembership(ctx, body)
+	if err != nil {
+		return errorResult("Failed to create membership: %v", err), nil
+	}
+	var m external.MembershipReadModel
+	if err := openproject.ReadResponse(resp, &m); err != nil {
+		return errorResult("Failed to create membership: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Membership #%d created successfully!", m.Id)), nil
 }
 
 func (r *Registry) updateMembership(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args UpdateMembershipArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.UpdateMembershipOptions{RoleIDs: args.RoleIDs}
-	m, err := r.client.UpdateMembership(ctx, args.ID, opts)
-	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to update membership: %v", err)}}}, nil
+	roleLinks := make([]external.Link, len(args.RoleIDs))
+	for i, rid := range args.RoleIDs {
+		roleLinks[i] = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/roles/%d", rid))}
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Membership #%d updated successfully!", m.ID)}}}, nil
+
+	body := external.MembershipWriteModel{
+		UnderscoreLinks: struct {
+			Principal *external.Link   `json:"principal,omitempty"`
+			Project   *external.Link   `json:"project,omitempty"`
+			Roles     *[]external.Link `json:"roles,omitempty"`
+		}{
+			Roles: &roleLinks,
+		},
+	}
+
+	resp, err := r.client.APIClient().UpdateMembership(ctx, args.ID, body)
+	if err != nil {
+		return errorResult("Failed to update membership: %v", err), nil
+	}
+	var m external.MembershipReadModel
+	if err := openproject.ReadResponse(resp, &m); err != nil {
+		return errorResult("Failed to update membership: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Membership #%d updated successfully!", m.Id)), nil
 }
 
 func (r *Registry) deleteMembership(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args DeleteMembershipArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	if err := r.client.DeleteMembership(ctx, args.ID); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to delete membership: %v", err)}}}, nil
+	resp, err := r.client.APIClient().DeleteMembership(ctx, args.ID)
+	if err != nil {
+		return errorResult("Failed to delete membership: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Membership #%d deleted successfully!", args.ID)}}}, nil
+	if err := openproject.ReadResponse(resp, nil); err != nil {
+		return errorResult("Failed to delete membership: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Membership #%d deleted successfully!", args.ID)), nil
 }
 
 func (r *Registry) listProjectMembers(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListProjectMembersArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	list, err := r.client.ListProjectMemberships(ctx, args.ProjectID)
+	params := &external.ListMembershipsParams{
+		Filters: strPtr(fmt.Sprintf(`[{"project":{"operator":"=","values":["%d"]}}]`, args.ProjectID)),
+	}
+
+	resp, err := r.client.APIClient().ListMemberships(ctx, params)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list project members: %v", err)}}}, nil
+		return errorResult("Failed to list project members: %v", err), nil
+	}
+
+	var list external.MembershipCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list project members: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d members:\n\n", list.Total)
-	for _, m := range list.Embedded.Elements {
-		if m.Links != nil && m.Links.Principal != nil {
+	for _, m := range list.UnderscoreEmbedded.Elements {
+		if m.UnderscoreLinks.Principal.Title != nil {
 			roles := []string{}
-			for _, role := range m.Links.Roles {
-				if role != nil {
-					roles = append(roles, role.Title)
+			for _, role := range m.UnderscoreLinks.Roles {
+				if role.Title != nil {
+					roles = append(roles, *role.Title)
 				}
 			}
-			result += fmt.Sprintf("- **%s** — %s\n", m.Links.Principal.Title, strings.Join(roles, ", "))
+			result += fmt.Sprintf("- **%s** — %s\n", *m.UnderscoreLinks.Principal.Title, strings.Join(roles, ", "))
 		}
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) listRoles(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	list, err := r.client.ListRoles(ctx)
+	resp, err := r.client.APIClient().ListRoles(ctx, nil)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list roles: %v", err)}}}, nil
+		return errorResult("Failed to list roles: %v", err), nil
 	}
 
-	result := fmt.Sprintf("Found %d roles:\n\n", list.Total)
-	for _, role := range list.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d)\n", role.Name, role.ID)
+	// ListRoles returns an indeterminate model; read raw and try to parse
+	var raw map[string]interface{}
+	if err := openproject.ReadResponseRawTo(resp, &raw); err != nil {
+		return errorResult("Failed to list roles: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+
+	// Try to extract embedded elements
+	result := "Available roles:\n\n"
+	if embedded, ok := raw["_embedded"].(map[string]interface{}); ok {
+		if elements, ok := embedded["elements"].([]interface{}); ok {
+			for _, e := range elements {
+				if elem, ok := e.(map[string]interface{}); ok {
+					name, _ := elem["name"].(string)
+					id, _ := elem["id"].(float64)
+					result += fmt.Sprintf("- **%s** (ID: %d)\n", name, int(id))
+				}
+			}
+		}
+	}
+	return textResult(result), nil
 }
 
 func (r *Registry) getRole(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args GetRoleArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	role, err := r.client.GetRole(ctx, args.ID)
+	resp, err := r.client.APIClient().ViewRole(ctx, args.ID)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to get role: %v", err)}}}, nil
+		return errorResult("Failed to get role: %v", err), nil
+	}
+	var role external.RoleModel
+	if err := openproject.ReadResponse(resp, &role); err != nil {
+		return errorResult("Failed to get role: %v", err), nil
 	}
 
-	result := fmt.Sprintf("# %s\n\n- **ID:** %d\n", role.Name, role.ID)
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	result := fmt.Sprintf("# %s\n\n- **ID:** %d\n", role.Name, derefInt(role.Id))
+	return textResult(result), nil
 }

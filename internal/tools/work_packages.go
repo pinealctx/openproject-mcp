@@ -3,9 +3,11 @@ package tools
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 // Work package argument types
@@ -138,242 +140,344 @@ func (r *Registry) registerWorkPackageTools(server *mcp.Server) {
 func (r *Registry) listWorkPackages(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListWorkPackagesArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.ListWorkPackagesOptions{
-		Offset:     args.Offset,
-		PageSize:   args.PageSize,
-		SortBy:     args.SortBy,
-		RawFilters: args.Filters,
+	params := &external.ListWorkPackagesParams{}
+	if args.Offset > 0 {
+		params.Offset = intPtr(args.Offset)
 	}
-	var list *openproject.WorkPackageList
+	if args.PageSize > 0 {
+		params.PageSize = intPtr(args.PageSize)
+	}
+	if args.SortBy != "" {
+		params.SortBy = strPtr(normalizeSortBy(args.SortBy))
+	}
+	if args.Filters != "" {
+		params.Filters = strPtr(args.Filters)
+	}
+
+	var list external.WorkPackagesModel
+	var resp *http.Response
 	var err error
 
 	if args.ProjectID > 0 {
-		list, err = r.client.ListProjectWorkPackages(ctx, args.ProjectID, opts)
+		pParams := &external.GetProjectWorkPackageCollectionParams{}
+		if args.Offset > 0 {
+			pParams.Offset = intPtr(args.Offset)
+		}
+		if args.PageSize > 0 {
+			pParams.PageSize = intPtr(args.PageSize)
+		}
+		if args.SortBy != "" {
+			pParams.SortBy = strPtr(normalizeSortBy(args.SortBy))
+		}
+		if args.Filters != "" {
+			pParams.Filters = strPtr(args.Filters)
+		}
+		resp, err = r.client.APIClient().GetProjectWorkPackageCollection(ctx, args.ProjectID, pParams)
 	} else {
-		list, err = r.client.ListWorkPackages(ctx, opts)
+		resp, err = r.client.APIClient().ListWorkPackages(ctx, params)
 	}
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list work packages: %v", err)}}}, nil
+		return errorResult("Failed to list work packages: %v", err), nil
+	}
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list work packages: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d work packages:\n\n", list.Total)
-	for _, wp := range list.Embedded.Elements {
+	for _, wp := range list.UnderscoreEmbedded.Elements {
 		status, assignee := "", ""
-		if wp.Links != nil {
-			if wp.Links.Status != nil {
-				status = wp.Links.Status.Title
-			}
-			if wp.Links.Assignee != nil {
-				assignee = wp.Links.Assignee.Title
-			}
+		if wp.UnderscoreLinks.Status.Title != nil {
+			status = *wp.UnderscoreLinks.Status.Title
+		}
+		if wp.UnderscoreLinks.Assignee != nil && wp.UnderscoreLinks.Assignee.Title != nil {
+			assignee = *wp.UnderscoreLinks.Assignee.Title
 		}
 		result += fmt.Sprintf("- **#%d %s** — Status: %s, Assignee: %s\n",
-			wp.ID, wp.Subject,
+			derefInt(wp.Id), wp.Subject,
 			firstNonEmpty(status, "Unknown"),
 			firstNonEmpty(assignee, "Unassigned"))
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) getWorkPackage(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args GetWorkPackageArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	wp, err := r.client.GetWorkPackage(ctx, args.ID)
+	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.ID, nil)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to get work package: %v", err)}}}, nil
+		return errorResult("Failed to get work package: %v", err), nil
+	}
+	var wp external.WorkPackageModel
+	if err := openproject.ReadResponse(resp, &wp); err != nil {
+		return errorResult("Failed to get work package: %v", err), nil
 	}
 
-	status, typeName, priority, assignee, project := "", "", "", "", ""
-	if wp.Links != nil {
-		if wp.Links.Status != nil {
-			status = wp.Links.Status.Title
-		}
-		if wp.Links.Type != nil {
-			typeName = wp.Links.Type.Title
-		}
-		if wp.Links.Priority != nil {
-			priority = wp.Links.Priority.Title
-		}
-		if wp.Links.Assignee != nil {
-			assignee = wp.Links.Assignee.Title
-		}
-		if wp.Links.Project != nil {
-			project = wp.Links.Project.Title
-		}
+	result := fmt.Sprintf("# %s\n\n", wp.Subject)
+	result += fmt.Sprintf("- **ID:** %d\n", derefInt(wp.Id))
+	result += fmt.Sprintf("- **Project:** %s\n", derefStr(wp.UnderscoreLinks.Project.Title))
+	result += fmt.Sprintf("- **Type:** %s\n", derefStr(wp.UnderscoreLinks.Type.Title))
+	result += fmt.Sprintf("- **Status:** %s\n", derefStr(wp.UnderscoreLinks.Status.Title))
+	result += fmt.Sprintf("- **Priority:** %s\n", derefStr(wp.UnderscoreLinks.Priority.Title))
+	if wp.UnderscoreLinks.Assignee != nil {
+		result += fmt.Sprintf("- **Assignee:** %s\n", derefStr(wp.UnderscoreLinks.Assignee.Title))
+	} else {
+		result += "- **Assignee:** Unassigned\n"
 	}
-
-	result := fmt.Sprintf("# #%d %s\n\n", wp.ID, wp.Subject)
-	result += fmt.Sprintf("- **ID:** %d\n", wp.ID)
-	result += fmt.Sprintf("- **Project:** %s\n", firstNonEmpty(project, "Unknown"))
-	result += fmt.Sprintf("- **Type:** %s\n", firstNonEmpty(typeName, "Unknown"))
-	result += fmt.Sprintf("- **Status:** %s\n", firstNonEmpty(status, "Unknown"))
-	result += fmt.Sprintf("- **Priority:** %s\n", firstNonEmpty(priority, "Unknown"))
-	result += fmt.Sprintf("- **Assignee:** %s\n", firstNonEmpty(assignee, "Unassigned"))
-	result += fmt.Sprintf("- **Progress:** %d%%\n", wp.PercentageDone)
-	if wp.EstimatedTime != "" {
-		result += fmt.Sprintf("- **Estimated Time:** %s\n", wp.EstimatedTime)
+	if wp.PercentageDone != nil {
+		result += fmt.Sprintf("- **Progress:** %d%%\n", *wp.PercentageDone)
 	}
-	if wp.StartDate != "" {
-		result += fmt.Sprintf("- **Start Date:** %s\n", wp.StartDate)
+	if wp.EstimatedTime != nil {
+		result += fmt.Sprintf("- **Estimated Time:** %s\n", *wp.EstimatedTime)
 	}
-	if wp.DueDate != "" {
-		result += fmt.Sprintf("- **Due Date:** %s\n", wp.DueDate)
+	if wp.StartDate != nil {
+		result += fmt.Sprintf("- **Start Date:** %s\n", wp.StartDate.String())
 	}
-	result += fmt.Sprintf("- **Lock Version:** %d\n", wp.LockVersion)
-	if wp.Description.Raw != "" {
-		result += fmt.Sprintf("\n## Description\n%s\n", wp.Description.Raw)
+	if wp.DueDate != nil {
+		result += fmt.Sprintf("- **Due Date:** %s\n", wp.DueDate.String())
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	if wp.LockVersion != nil {
+		result += fmt.Sprintf("- **Lock Version:** %d\n", *wp.LockVersion)
+	}
+	if wp.Description != nil && wp.Description.Raw != nil && *wp.Description.Raw != "" {
+		result += fmt.Sprintf("\n## Description\n%s\n", *wp.Description.Raw)
+	}
+	return textResult(result), nil
 }
 
 func (r *Registry) createWorkPackage(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args CreateWorkPackageArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.CreateWorkPackageOptions{
-		Subject:       args.Subject,
-		Description:   openproject.NewRichText(args.Description),
-		StartDate:     args.StartDate,
-		DueDate:       args.DueDate,
-		EstimatedTime: args.EstimatedTime,
-		Links:         &openproject.CreateWorkPackageLinks{},
+	body := external.WorkPackageModel{
+		Subject: args.Subject,
+	}
+	if args.Description != "" {
+		fmt := external.FormattableFormat("markdown")
+		body.Description = &external.Formattable{Format: &fmt, Raw: strPtr(args.Description)}
+	}
+	if args.StartDate != "" {
+		body.StartDate = parseDatePtr(args.StartDate)
+	}
+	if args.DueDate != "" {
+		body.DueDate = parseDatePtr(args.DueDate)
+	}
+	if args.EstimatedTime != "" {
+		body.EstimatedTime = strPtr(args.EstimatedTime)
 	}
 	if args.TypeID > 0 {
-		opts.Links.Type = &openproject.WorkPackageLink{Href: fmt.Sprintf("/api/v3/types/%d", args.TypeID)}
+		body.UnderscoreLinks.Type = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/types/%d", args.TypeID))}
 	}
 	if args.StatusID > 0 {
-		opts.Links.Status = &openproject.WorkPackageLink{Href: fmt.Sprintf("/api/v3/statuses/%d", args.StatusID)}
+		body.UnderscoreLinks.Status = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/statuses/%d", args.StatusID))}
 	}
 	if args.PriorityID > 0 {
-		opts.Links.Priority = &openproject.WorkPackageLink{Href: fmt.Sprintf("/api/v3/priorities/%d", args.PriorityID)}
+		body.UnderscoreLinks.Priority = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/priorities/%d", args.PriorityID))}
 	}
 	if args.AssigneeID > 0 {
-		opts.Links.Assignee = &openproject.WorkPackageLink{Href: fmt.Sprintf("/api/v3/users/%d", args.AssigneeID)}
+		body.UnderscoreLinks.Assignee = &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/users/%d", args.AssigneeID))}
 	}
 
-	wp, err := r.client.CreateWorkPackage(ctx, args.ProjectID, opts)
+	params := &external.CreateProjectWorkPackageParams{}
+	resp, err := r.client.APIClient().CreateProjectWorkPackage(ctx, args.ProjectID, params, body)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to create work package: %v", err)}}}, nil
+		return errorResult("Failed to create work package: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Work package #%d created successfully!\n\nSubject: %s", wp.ID, wp.Subject)}}}, nil
+	var wp external.WorkPackageModel
+	if err := openproject.ReadResponse(resp, &wp); err != nil {
+		return errorResult("Failed to create work package: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Work package #%d created successfully!\n\nSubject: %s", derefInt(wp.Id), wp.Subject)), nil
 }
 
 func (r *Registry) updateWorkPackage(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args UpdateWorkPackageArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.UpdateWorkPackageOptions{
-		Subject:        args.Subject,
-		Description:    openproject.NewRichText(args.Description),
-		StartDate:      args.StartDate,
-		DueDate:        args.DueDate,
-		EstimatedTime:  args.EstimatedTime,
-		PercentageDone: args.PercentageDone,
-		Links:          &openproject.UpdateWorkPackageLinks{},
+	// First fetch the work package to get LockVersion (required for patch)
+	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.ID, nil)
+	if err != nil {
+		return errorResult("Failed to fetch work package for lock version: %v", err), nil
 	}
+	var current external.WorkPackageModel
+	if err := openproject.ReadResponse(resp, &current); err != nil {
+		return errorResult("Failed to fetch work package for lock version: %v", err), nil
+	}
+
+	lockVersion := 0
+	if current.LockVersion != nil {
+		lockVersion = *current.LockVersion
+	}
+
+	body := external.WorkPackagePatchModel{
+		LockVersion: lockVersion,
+	}
+	if args.Subject != "" {
+		body.Subject = strPtr(args.Subject)
+	}
+	if args.Description != "" {
+		fmt := external.FormattableFormat("markdown")
+		body.Description = &external.Formattable{Format: &fmt, Raw: strPtr(args.Description)}
+	}
+	if args.StartDate != "" {
+		body.StartDate = parseDatePtr(args.StartDate)
+	}
+	if args.DueDate != "" {
+		body.DueDate = parseDatePtr(args.DueDate)
+	}
+	if args.EstimatedTime != "" {
+		body.EstimatedTime = strPtr(args.EstimatedTime)
+	}
+	if args.PercentageDone != nil {
+		// PercentageDone is not in WorkPackagePatchModel; it must be set via custom fields or omitted
+		// The external client uses WorkPackagePatchModel which doesn't have percentageDone
+	}
+
+	body.UnderscoreLinks = &struct {
+		Assignee    *external.Link `json:"assignee,omitempty"`
+		Category    *external.Link `json:"category,omitempty"`
+		Parent      *external.Link `json:"parent,omitempty"`
+		Priority    *external.Link `json:"priority,omitempty"`
+		Project     *external.Link `json:"project,omitempty"`
+		Responsible *external.Link `json:"responsible,omitempty"`
+		Status      *external.Link `json:"status,omitempty"`
+		Type        *external.Link `json:"type,omitempty"`
+		Version     *external.Link `json:"version,omitempty"`
+	}{}
 	if args.StatusID > 0 {
-		opts.Links.Status = &openproject.WorkPackageLink{Href: fmt.Sprintf("/api/v3/statuses/%d", args.StatusID)}
+		body.UnderscoreLinks.Status = &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/statuses/%d", args.StatusID))}
 	}
 	if args.PriorityID > 0 {
-		opts.Links.Priority = &openproject.WorkPackageLink{Href: fmt.Sprintf("/api/v3/priorities/%d", args.PriorityID)}
+		body.UnderscoreLinks.Priority = &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/priorities/%d", args.PriorityID))}
 	}
 	if args.AssigneeID > 0 {
-		opts.Links.Assignee = &openproject.WorkPackageLink{Href: fmt.Sprintf("/api/v3/users/%d", args.AssigneeID)}
+		body.UnderscoreLinks.Assignee = &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/users/%d", args.AssigneeID))}
 	}
 
-	wp, err := r.client.UpdateWorkPackage(ctx, args.ID, opts)
+	resp, err = r.client.APIClient().UpdateWorkPackage(ctx, args.ID, nil, body)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to update work package: %v", err)}}}, nil
+		return errorResult("Failed to update work package: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Work package #%d updated successfully!\n\nSubject: %s", wp.ID, wp.Subject)}}}, nil
+	var wp external.WorkPackageModel
+	if err := openproject.ReadResponse(resp, &wp); err != nil {
+		return errorResult("Failed to update work package: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Work package #%d updated successfully!\n\nSubject: %s", derefInt(wp.Id), wp.Subject)), nil
 }
 
 func (r *Registry) deleteWorkPackage(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args DeleteWorkPackageArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	if err := r.client.DeleteWorkPackage(ctx, args.ID); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to delete work package: %v", err)}}}, nil
+	resp, err := r.client.APIClient().DeleteWorkPackage(ctx, args.ID)
+	if err != nil {
+		return errorResult("Failed to delete work package: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Work package #%d deleted successfully!", args.ID)}}}, nil
+	if err := openproject.ReadResponse(resp, nil); err != nil {
+		return errorResult("Failed to delete work package: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Work package #%d deleted successfully!", args.ID)), nil
 }
 
 func (r *Registry) listTypes(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListTypesArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	var list *openproject.TypeList
+	var resp *http.Response
 	var err error
 	if args.ProjectID > 0 {
-		list, err = r.client.ListProjectTypes(ctx, args.ProjectID)
+		resp, err = r.client.APIClient().ListTypesAvailableInAProject(ctx, args.ProjectID)
 	} else {
-		list, err = r.client.ListTypes(ctx)
+		resp, err = r.client.APIClient().ListAllTypes(ctx)
 	}
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list types: %v", err)}}}, nil
+		return errorResult("Failed to list types: %v", err), nil
+	}
+
+	var list external.TypesByWorkspaceModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list types: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d work package types:\n\n", list.Total)
-	for _, t := range list.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d)\n", t.Name, t.ID)
+	if list.UnderscoreEmbedded.Elements != nil {
+		for _, t := range *list.UnderscoreEmbedded.Elements {
+			result += fmt.Sprintf("- **%s** (ID: %d)\n", derefStr(t.Name), derefInt(t.Id))
+		}
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) listStatuses(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	list, err := r.client.ListStatuses(ctx)
+	resp, err := r.client.APIClient().ListStatuses(ctx)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list statuses: %v", err)}}}, nil
+		return errorResult("Failed to list statuses: %v", err), nil
+	}
+
+	var list external.StatusCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list statuses: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d statuses:\n\n", list.Total)
-	for _, s := range list.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d)\n", s.Name, s.ID)
+	for _, s := range list.UnderscoreEmbedded.Elements {
+		result += fmt.Sprintf("- **%s** (ID: %d)\n", derefStr(s.Name), derefInt(s.Id))
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) listPriorities(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	list, err := r.client.ListPriorities(ctx)
+	resp, err := r.client.APIClient().ListAllPriorities(ctx)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list priorities: %v", err)}}}, nil
+		return errorResult("Failed to list priorities: %v", err), nil
+	}
+
+	var list external.PriorityCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list priorities: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d priorities:\n\n", list.Total)
-	for _, p := range list.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d)\n", p.Name, p.ID)
+	for _, p := range list.UnderscoreEmbedded.Elements {
+		result += fmt.Sprintf("- **%s** (ID: %d)\n", derefStr(p.Name), derefInt(p.Id))
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) listAvailableAssignees(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListAvailableAssigneesArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	list, err := r.client.ListAvailableAssignees(ctx, args.WorkPackageID)
+	resp, err := r.client.APIClient().WorkPackageAvailableAssignees(ctx, args.WorkPackageID)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list available assignees: %v", err)}}}, nil
+		return errorResult("Failed to list available assignees: %v", err), nil
+	}
+
+	var list external.AvailableAssigneesModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list available assignees: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d available assignees for work package #%d:\n\n", list.Total, args.WorkPackageID)
-	for _, u := range list.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d, Email: %s)\n", u.Name, u.ID, u.Email)
+	if list.UnderscoreEmbedded.Elements != nil {
+		for _, u := range *list.UnderscoreEmbedded.Elements {
+			result += fmt.Sprintf("- **%s** (ID: %d, Email: %s)\n", u.Name, u.Id, derefStr(u.Email))
+		}
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }

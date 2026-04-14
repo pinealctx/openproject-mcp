@@ -18,7 +18,11 @@ var connectionTestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		cmd.Printf("Connection successful! Logged in as: %s (%s)", user.Name, user.Email)
+		email := ""
+		if user.Email != nil {
+			email = *user.Email
+		}
+		cmd.Printf("Connection successful! Logged in as: %s (%s)", user.Name, email)
 		return nil
 	},
 }

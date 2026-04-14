@@ -14,8 +14,10 @@ import (
 )
 
 var (
-	mcpTransport string
-	mcpPort      int
+	mcpTransport   string
+	mcpPort        int
+	mcpToolMode    string
+	mcpEnabledTools string
 )
 
 // mcpCmd represents the mcp command.
@@ -51,6 +53,15 @@ AUTHENTICATION:
   Alternatively, use global flags:
     --url       OpenProject URL
     --api-key   API key
+
+TOOL MODES:
+
+  default   Register the standard set of MCP tools (default)
+  full      Register all available tools including extended ones
+  custom    Register only tools listed in --enabled-tools
+
+  Example:
+    --tool-mode custom --enabled-tools "list_projects,get_project,create_work_package"
 
 STDIO MODE USAGE:
 
@@ -100,7 +111,10 @@ EXAMPLES:
   openproject-mcp mcp -t sse -p 3000
 
   # HTTP mode on port 8080
-  openproject-mcp mcp -t http -p 8080`,
+  openproject-mcp mcp -t http -p 8080
+
+  # Custom tool mode with specific tools
+  openproject-mcp mcp --tool-mode custom --enabled-tools "list_projects,get_project,list_work_packages"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runMCPServer(cmd)
 	},
@@ -110,6 +124,8 @@ func init() {
 	rootCmd.AddCommand(mcpCmd)
 	mcpCmd.Flags().StringVarP(&mcpTransport, "transport", "t", "", "Transport type: stdio, sse, or http")
 	mcpCmd.Flags().IntVarP(&mcpPort, "port", "p", 0, "Port for SSE/HTTP transport")
+	mcpCmd.Flags().StringVar(&mcpToolMode, "tool-mode", "", "Tool mode: default, full, or custom")
+	mcpCmd.Flags().StringVar(&mcpEnabledTools, "enabled-tools", "", "Comma-separated list of enabled tools (for custom mode)")
 }
 
 // runMCPServer starts the MCP server with the configured transport.
@@ -128,6 +144,14 @@ func runMCPServer(cmd *cobra.Command) {
 		cfg.Port = mcpPort
 	}
 
+	// Apply tool mode flags
+	if mcpToolMode != "" {
+		cfg.ToolMode = mcpToolMode
+	}
+	if mcpEnabledTools != "" {
+		cfg.EnabledTools = mcpEnabledTools
+	}
+
 	// Setup logging for MCP mode
 	setupMCPLogging(cfg)
 
@@ -139,6 +163,7 @@ func runMCPServer(cmd *cobra.Command) {
 	slog.Info("Starting OpenProject MCP Server",
 		"version", Version,
 		"transport", cfg.Transport,
+		"toolMode", cfg.ToolMode,
 		"openproject_url", cfg.OpenProjectURL,
 	)
 

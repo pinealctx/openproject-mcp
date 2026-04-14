@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 type ListUsersArgs struct {
@@ -38,42 +39,56 @@ func (r *Registry) registerUserTools(server *mcp.Server) {
 func (r *Registry) listUsers(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListUsersArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.ListUsersOptions{Offset: args.Offset, PageSize: args.PageSize, SortBy: args.SortBy}
-	users, err := r.client.ListUsers(ctx, opts)
+	params := &external.ListUsersParams{}
+	if args.Offset > 0 {
+		params.Offset = intPtr(args.Offset)
+	}
+	if args.PageSize > 0 {
+		params.PageSize = intPtr(args.PageSize)
+	}
+	if args.SortBy != "" {
+		params.SortBy = strPtr(normalizeSortBy(args.SortBy))
+	}
+
+	resp, err := r.client.APIClient().ListUsers(ctx, params)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list users: %v", err)}}}, nil
+		return errorResult("Failed to list users: %v", err), nil
 	}
 
-	result := fmt.Sprintf("Found %d users:\n\n", users.Total)
-	for _, u := range users.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d) — %s", u.Name, u.ID, u.Email)
-		if u.Admin {
+	var list external.UserCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list users: %v", err), nil
+	}
+
+	result := fmt.Sprintf("Found %d users:\n\n", list.Total)
+	for _, u := range list.UnderscoreEmbedded.Elements {
+		result += fmt.Sprintf("- **%s** (ID: %d) — %s", u.Name, u.Id, derefStr(u.Email))
+		if derefBool(u.Admin) {
 			result += " [Admin]"
 		}
 		result += "\n"
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) getUser(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args GetUserArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	user, err := r.client.GetUser(ctx, args.ID)
+	// ViewUser takes string ID
+	resp, err := r.client.APIClient().ViewUser(ctx, fmt.Sprintf("%d", args.ID))
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to get user: %v", err)}}}, nil
+		return errorResult("Failed to get user: %v", err), nil
+	}
+	var user external.UserModel
+	if err := openproject.ReadResponse(resp, &user); err != nil {
+		return errorResult("Failed to get user: %v", err), nil
 	}
 
-	result := fmt.Sprintf("# %s\n\n", user.Name)
-	result += fmt.Sprintf("- **ID:** %d\n", user.ID)
-	result += fmt.Sprintf("- **Login:** %s\n", user.Login)
-	result += fmt.Sprintf("- **Email:** %s\n", user.Email)
-	result += fmt.Sprintf("- **Admin:** %v\n", user.Admin)
-	result += fmt.Sprintf("- **Status:** %s\n", user.Status)
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(formatUser(&user)), nil
 }

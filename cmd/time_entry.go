@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -80,34 +81,40 @@ var timeEntryListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List time entries",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		opts := &openproject.ListTimeEntriesOptions{
-			PageSize: timeEntryListPageSize,
-			SortBy:   timeEntryListSortBy,
+		api := getClient().APIClient()
+		params := &openproject.ListTimeEntriesParams{}
+		if timeEntryListPageSize > 0 {
+			params.PageSize = ptr(timeEntryListPageSize)
 		}
-		if timeEntryListProjectID > 0 || timeEntryListUserID > 0 || timeEntryListWorkPackageID > 0 {
-			var filters []openproject.TimeEntryFilter
-			if timeEntryListProjectID > 0 {
-				filters = append(filters, openproject.TimeEntryFilter{
-					Name: "project", Operator: "=", Values: []string{strconv.Itoa(timeEntryListProjectID)},
-				})
-			}
-			if timeEntryListUserID > 0 {
-				filters = append(filters, openproject.TimeEntryFilter{
-					Name: "user", Operator: "=", Values: []string{strconv.Itoa(timeEntryListUserID)},
-				})
-			}
-			if timeEntryListWorkPackageID > 0 {
-				filters = append(filters, openproject.TimeEntryFilter{
-					Name: "workPackage", Operator: "=", Values: []string{strconv.Itoa(timeEntryListWorkPackageID)},
-				})
-			}
-			opts.Filters = filters
+		if timeEntryListSortBy != "" {
+			params.SortBy = ptr(normalizeSortBy(timeEntryListSortBy))
 		}
-		list, err := getClient().ListTimeEntries(getContext(), opts)
+
+		// Build filters
+		var filters []string
+		if timeEntryListProjectID > 0 {
+			filters = append(filters, fmt.Sprintf(`{"project_id":{"operator":"=","values":["%d"]}}`, timeEntryListProjectID))
+		}
+		if timeEntryListUserID > 0 {
+			filters = append(filters, fmt.Sprintf(`{"user_id":{"operator":"=","values":["%d"]}}`, timeEntryListUserID))
+		}
+		if timeEntryListWorkPackageID > 0 {
+			filters = append(filters, fmt.Sprintf(`{"entity_id":{"operator":"=","values":["%d"]}}`, timeEntryListWorkPackageID))
+		}
+		if len(filters) > 0 {
+			filterStr := "[" + joinStrings(filters, ",") + "]"
+			params.Filters = ptr(filterStr)
+		}
+
+		resp, err := api.ListTimeEntries(getContext(), params)
 		if err != nil {
 			return err
 		}
-		return output(list)
+		var result openproject.TimeEntryCollectionModel
+		if err := openproject.ReadResponse(resp, &result); err != nil {
+			return err
+		}
+		return output(&result)
 	},
 }
 
@@ -119,20 +126,47 @@ var timeEntryCreateCmd = &cobra.Command{
 		if spentOn == "" {
 			spentOn = time.Now().Format("2006-01-02")
 		}
-		opts := &openproject.CreateTimeEntryOptions{
-			Hours:       timeEntryCreateHours,
-			Comment:     timeEntryCreateComment,
-			SpentOn:     spentOn,
-			ProjectID:   timeEntryCreateProjectID,
-			WorkPackage: timeEntryCreateWorkPackageID,
-			ActivityID:  timeEntryCreateActivityID,
-			UserID:      timeEntryCreateUserID,
+		body := external.TimeEntryModel{
+			Hours: ptr(timeEntryCreateHours),
 		}
-		entry, err := getClient().CreateTimeEntry(getContext(), opts)
-		if err != nil {
+		if timeEntryCreateComment != "" {
+			fmt_ := external.FormattableFormat("markdown")
+			body.Comment = &external.Formattable{Format: &fmt_, Raw: ptr(timeEntryCreateComment)}
+		}
+
+		// Set links for project, work package, activity, user
+		if timeEntryCreateProjectID > 0 {
+			body.UnderscoreLinks.Project = external.Link{Href: ptr(fmt.Sprintf("/api/v3/projects/%d", timeEntryCreateProjectID))}
+		}
+		if timeEntryCreateWorkPackageID > 0 {
+			body.UnderscoreLinks.Entity = external.Link{Href: ptr(fmt.Sprintf("/api/v3/work_packages/%d", timeEntryCreateWorkPackageID))}
+		}
+		if timeEntryCreateActivityID > 0 {
+			body.UnderscoreLinks.Activity = external.Link{Href: ptr(fmt.Sprintf("/api/v3/time_entry_activities/%d", timeEntryCreateActivityID))}
+		}
+		if timeEntryCreateUserID > 0 {
+			body.UnderscoreLinks.User = external.Link{Href: ptr(fmt.Sprintf("/api/v3/users/%d", timeEntryCreateUserID))}
+		}
+
+		// Set spentOn via raw POST since TimeEntryModel.SpentOn is *openapi_types.Date
+		// We'll use the raw client to create the time entry
+		rawBody := map[string]interface{}{
+			"hours": timeEntryCreateHours,
+			"_links": buildTimeEntryLinks(),
+		}
+		if timeEntryCreateComment != "" {
+			rawBody["comment"] = map[string]interface{}{
+				"format": "markdown",
+				"raw":    timeEntryCreateComment,
+			}
+		}
+		rawBody["spentOn"] = spentOn
+
+		var result openproject.TimeEntryModel
+		if err := getClient().Post(getContext(), "/time_entries", rawBody, &result); err != nil {
 			return err
 		}
-		return output(entry)
+		return output(&result)
 	},
 }
 
@@ -145,17 +179,34 @@ var timeEntryUpdateCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid time entry ID: %s", args[0])
 		}
-		opts := &openproject.UpdateTimeEntryOptions{
-			Hours:      timeEntryUpdateHours,
-			Comment:    timeEntryUpdateComment,
-			SpentOn:    timeEntryUpdateSpentOn,
-			ActivityID: timeEntryUpdateActivityID,
+
+		// Build update body using raw PATCH
+		body := map[string]interface{}{}
+		if timeEntryUpdateHours != "" {
+			body["hours"] = timeEntryUpdateHours
 		}
-		entry, err := getClient().UpdateTimeEntry(getContext(), id, opts)
-		if err != nil {
+		if timeEntryUpdateComment != "" {
+			body["comment"] = map[string]interface{}{
+				"format": "markdown",
+				"raw":    timeEntryUpdateComment,
+			}
+		}
+		if timeEntryUpdateSpentOn != "" {
+			body["spentOn"] = timeEntryUpdateSpentOn
+		}
+		if timeEntryUpdateActivityID > 0 {
+			body["_links"] = map[string]interface{}{
+				"activity": map[string]interface{}{
+					"href": fmt.Sprintf("/api/v3/time_entry_activities/%d", timeEntryUpdateActivityID),
+				},
+			}
+		}
+
+		var result openproject.TimeEntryModel
+		if err := getClient().Patch(getContext(), fmt.Sprintf("/time_entries/%d", id), body, &result); err != nil {
 			return err
 		}
-		return output(entry)
+		return output(&result)
 	},
 }
 
@@ -168,7 +219,12 @@ var timeEntryDeleteCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid time entry ID: %s", args[0])
 		}
-		if err := getClient().DeleteTimeEntry(getContext(), id); err != nil {
+		api := getClient().APIClient()
+		resp, err := api.DeleteTimeEntry(getContext(), id)
+		if err != nil {
+			return err
+		}
+		if err := openproject.ReadResponse(resp, nil); err != nil {
 			return err
 		}
 		fmt.Println("Time entry deleted successfully")
@@ -180,12 +236,51 @@ var timeEntryActivitiesCmd = &cobra.Command{
 	Use:   "activities",
 	Short: "List time entry activities",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		list, err := getClient().ListTimeEntryActivities(getContext())
-		if err != nil {
+		// Use raw GET since there's no generated method for listing activities
+		var result interface{}
+		if err := getClient().Get(getContext(), "/time_entries/activities", &result); err != nil {
 			return err
 		}
-		return output(list)
+		return output(result)
 	},
+}
+
+// buildTimeEntryLinks constructs the _links portion for time entry creation.
+func buildTimeEntryLinks() map[string]interface{} {
+	links := map[string]interface{}{}
+	if timeEntryCreateProjectID > 0 {
+		links["project"] = map[string]interface{}{
+			"href": fmt.Sprintf("/api/v3/projects/%d", timeEntryCreateProjectID),
+		}
+	}
+	if timeEntryCreateWorkPackageID > 0 {
+		links["entity"] = map[string]interface{}{
+			"href": fmt.Sprintf("/api/v3/work_packages/%d", timeEntryCreateWorkPackageID),
+		}
+	}
+	if timeEntryCreateActivityID > 0 {
+		links["activity"] = map[string]interface{}{
+			"href": fmt.Sprintf("/api/v3/time_entry_activities/%d", timeEntryCreateActivityID),
+		}
+	}
+	if timeEntryCreateUserID > 0 {
+		links["user"] = map[string]interface{}{
+			"href": fmt.Sprintf("/api/v3/users/%d", timeEntryCreateUserID),
+		}
+	}
+	return links
+}
+
+// joinStrings joins string slice with separator.
+func joinStrings(ss []string, sep string) string {
+	result := ""
+	for i, s := range ss {
+		if i > 0 {
+			result += sep
+		}
+		result += s
+	}
+	return result
 }
 
 func init() {

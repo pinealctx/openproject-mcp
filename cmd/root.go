@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pinealctx/openproject-mcp/internal/config"
@@ -172,4 +173,33 @@ func getContext() context.Context {
 		ctx = context.Background()
 	}
 	return ctx
+}
+
+// ptr helper for creating pointer values for API params.
+func ptr[T any](v T) *T { return &v }
+
+// normalizeSortBy converts "name:asc" to JSON array format [["name","asc"]].
+func normalizeSortBy(s string) string {
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(s, "[") {
+		return s
+	}
+	parts := strings.Split(s, ",")
+	var pairs []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		segments := strings.SplitN(p, ":", 2)
+		field := segments[0]
+		dir := "asc"
+		if len(segments) > 1 {
+			dir = segments[1]
+		}
+		pairs = append(pairs, fmt.Sprintf(`["%s","%s"]`, field, dir))
+	}
+	return "[" + strings.Join(pairs, ",") + "]"
 }

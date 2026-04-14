@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 type ListTimeEntriesArgs struct {
@@ -84,89 +85,183 @@ func (r *Registry) registerTimeEntryTools(server *mcp.Server) {
 func (r *Registry) listTimeEntries(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListTimeEntriesArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.ListTimeEntriesOptions{Offset: args.Offset, PageSize: args.PageSize, SortBy: args.SortBy}
-	var filters []openproject.TimeEntryFilter
+	params := &external.ListTimeEntriesParams{}
+	if args.Offset > 0 {
+		params.Offset = intPtr(args.Offset)
+	}
+	if args.PageSize > 0 {
+		params.PageSize = intPtr(args.PageSize)
+	}
+	if args.SortBy != "" {
+		params.SortBy = strPtr(normalizeSortBy(args.SortBy))
+	}
+
+	var filters []string
 	if args.ProjectID > 0 {
-		filters = append(filters, openproject.TimeEntryFilter{Name: "project", Values: []string{fmt.Sprintf("%d", args.ProjectID)}})
+		filters = append(filters, fmt.Sprintf(`{"project_id":{"operator":"=","values":["%d"]}}`, args.ProjectID))
 	}
 	if args.WorkPackageID > 0 {
 		filters = append(filters,
-			openproject.TimeEntryFilter{Name: "entity_type", Values: []string{"WorkPackage"}},
-			openproject.TimeEntryFilter{Name: "entity_id", Values: []string{fmt.Sprintf("%d", args.WorkPackageID)}},
+			`{"entity_type":{"operator":"=","values":["WorkPackage"]}}`,
+			fmt.Sprintf(`{"entity_id":{"operator":"=","values":["%d"]}}`, args.WorkPackageID),
 		)
 	}
 	if args.UserID > 0 {
-		filters = append(filters, openproject.TimeEntryFilter{Name: "user_id", Values: []string{fmt.Sprintf("%d", args.UserID)}})
+		filters = append(filters, fmt.Sprintf(`{"user_id":{"operator":"=","values":["%d"]}}`, args.UserID))
 	}
-	opts.Filters = filters
+	if len(filters) > 0 {
+		params.Filters = strPtr("[" + joinStrings(filters, ",") + "]")
+	}
 
-	list, err := r.client.ListTimeEntries(ctx, opts)
+	resp, err := r.client.APIClient().ListTimeEntries(ctx, params)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list time entries: %v", err)}}}, nil
+		return errorResult("Failed to list time entries: %v", err), nil
+	}
+
+	var list external.TimeEntryCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list time entries: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d time entries:\n\n", list.Total)
-	for _, e := range list.Embedded.Elements {
-		result += fmt.Sprintf("- #%d: %s on %s\n", e.ID, e.Hours, e.SpentOn)
+	for _, e := range list.UnderscoreEmbedded.Elements {
+		spentOn := ""
+		if e.SpentOn != nil {
+			spentOn = e.SpentOn.String()
+		}
+		result += fmt.Sprintf("- #%d: %s on %s\n", derefInt(e.Id), derefStr(e.Hours), spentOn)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) createTimeEntry(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args CreateTimeEntryArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.CreateTimeEntryOptions{
-		Hours: args.Hours, Comment: args.Comment, SpentOn: args.SpentOn,
-		ProjectID: args.ProjectID, WorkPackage: args.WorkPackageID, ActivityID: args.ActivityID, UserID: args.UserID,
+	body := external.TimeEntryModel{}
+	if args.Hours != "" {
+		body.Hours = strPtr(args.Hours)
 	}
-	entry, err := r.client.CreateTimeEntry(ctx, opts)
+	if args.Comment != "" {
+		fmt := external.FormattableFormat("markdown")
+		body.Comment = &external.Formattable{Format: &fmt, Raw: strPtr(args.Comment)}
+	}
+	if args.SpentOn != "" {
+		body.SpentOn = parseDatePtr(args.SpentOn)
+	}
+
+	// Set links for project, activity, user, entity
+	body.UnderscoreLinks.Project = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/projects/%d", args.ProjectID))}
+	if args.ActivityID > 0 {
+		body.UnderscoreLinks.Activity = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/time_entries/activities/%d", args.ActivityID))}
+	}
+	if args.UserID > 0 {
+		body.UnderscoreLinks.User = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/users/%d", args.UserID))}
+	}
+	if args.WorkPackageID > 0 {
+		body.UnderscoreLinks.Entity = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/work_packages/%d", args.WorkPackageID))}
+	} else {
+		body.UnderscoreLinks.Entity = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/projects/%d", args.ProjectID))}
+	}
+
+	resp, err := r.client.APIClient().CreateTimeEntry(ctx, body)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to create time entry: %v", err)}}}, nil
+		return errorResult("Failed to create time entry: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Time entry #%d created: %s on %s", entry.ID, entry.Hours, entry.SpentOn)}}}, nil
+	var entry external.TimeEntryModel
+	if err := openproject.ReadResponse(resp, &entry); err != nil {
+		return errorResult("Failed to create time entry: %v", err), nil
+	}
+	spentOn := ""
+	if entry.SpentOn != nil {
+		spentOn = entry.SpentOn.String()
+	}
+	return textResult(fmt.Sprintf("Time entry #%d created: %s on %s", derefInt(entry.Id), derefStr(entry.Hours), spentOn)), nil
 }
 
 func (r *Registry) updateTimeEntry(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args UpdateTimeEntryArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.UpdateTimeEntryOptions{Hours: args.Hours, Comment: args.Comment, SpentOn: args.SpentOn, ActivityID: args.ActivityID}
-	entry, err := r.client.UpdateTimeEntry(ctx, args.ID, opts)
-	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to update time entry: %v", err)}}}, nil
+	// Use raw Patch via client for time entry update since generated UpdateTimeEntry has no body
+	body := map[string]interface{}{}
+	if args.Hours != "" {
+		body["hours"] = args.Hours
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Time entry #%d updated successfully!", entry.ID)}}}, nil
+	if args.Comment != "" {
+		body["comment"] = map[string]interface{}{
+			"format": "markdown",
+			"raw":    args.Comment,
+		}
+	}
+	if args.SpentOn != "" {
+		body["spentOn"] = args.SpentOn
+	}
+	if args.ActivityID > 0 {
+		body["_links"] = map[string]interface{}{
+			"activity": map[string]interface{}{
+				"href": fmt.Sprintf("/api/v3/time_entries/activities/%d", args.ActivityID),
+			},
+		}
+	}
+
+	var result external.TimeEntryModel
+	if err := r.client.Patch(ctx, fmt.Sprintf("/time_entries/%d", args.ID), body, &result); err != nil {
+		return errorResult("Failed to update time entry: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Time entry #%d updated successfully!", derefInt(result.Id))), nil
 }
 
 func (r *Registry) deleteTimeEntry(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args DeleteTimeEntryArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	if err := r.client.DeleteTimeEntry(ctx, args.ID); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to delete time entry: %v", err)}}}, nil
+	resp, err := r.client.APIClient().DeleteTimeEntry(ctx, args.ID)
+	if err != nil {
+		return errorResult("Failed to delete time entry: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Time entry #%d deleted successfully!", args.ID)}}}, nil
+	if err := openproject.ReadResponse(resp, nil); err != nil {
+		return errorResult("Failed to delete time entry: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Time entry #%d deleted successfully!", args.ID)), nil
 }
 
 func (r *Registry) listTimeEntryActivities(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	list, err := r.client.ListTimeEntryActivities(ctx)
-	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list activities: %v", err)}}}, nil
+	// Time entry activities are available via raw GET since there's no direct generated method
+	var result struct {
+		Total     int `json:"total"`
+		Embedded  struct {
+			Elements []external.TimeEntryActivityModel `json:"elements"`
+		} `json:"_embedded"`
+	}
+	if err := r.client.Get(ctx, "/time_entries/activities", &result); err != nil {
+		return errorResult("Failed to list activities: %v", err), nil
 	}
 
-	result := fmt.Sprintf("Found %d activities:\n\n", list.Total)
-	for _, a := range list.Embedded.Elements {
-		result += fmt.Sprintf("- **%s** (ID: %d)\n", a.Name, a.ID)
+	out := fmt.Sprintf("Found %d activities:\n\n", result.Total)
+	for _, a := range result.Embedded.Elements {
+		out += fmt.Sprintf("- **%s** (ID: %d)\n", a.Name, a.Id)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(out), nil
+}
+
+// joinStrings joins string slices with a separator.
+func joinStrings(ss []string, sep string) string {
+	result := ""
+	for i, s := range ss {
+		if i > 0 {
+			result += sep
+		}
+		result += s
+	}
+	return result
 }

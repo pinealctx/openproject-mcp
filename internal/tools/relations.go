@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
+	external "github.com/pinealctx/openproject"
 )
 
 type SetWorkPackageParentArgs struct {
@@ -83,114 +84,241 @@ func (r *Registry) registerRelationTools(server *mcp.Server) {
 func (r *Registry) setWorkPackageParent(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args SetWorkPackageParentArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	_, err := r.client.SetWorkPackageParent(ctx, args.WorkPackageID, args.ParentID)
+	// Need to fetch current WP to get lockVersion
+	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.WorkPackageID, nil)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to set parent: %v", err)}}}, nil
+		return errorResult("Failed to fetch work package: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Work package #%d parent set to #%d", args.WorkPackageID, args.ParentID)}}}, nil
+	var current external.WorkPackageModel
+	if err := openproject.ReadResponse(resp, &current); err != nil {
+		return errorResult("Failed to fetch work package: %v", err), nil
+	}
+
+	lockVersion := 0
+	if current.LockVersion != nil {
+		lockVersion = *current.LockVersion
+	}
+
+	body := external.WorkPackagePatchModel{
+		LockVersion: lockVersion,
+		UnderscoreLinks: &struct {
+			Assignee    *external.Link `json:"assignee,omitempty"`
+			Category    *external.Link `json:"category,omitempty"`
+			Parent      *external.Link `json:"parent,omitempty"`
+			Priority    *external.Link `json:"priority,omitempty"`
+			Project     *external.Link `json:"project,omitempty"`
+			Responsible *external.Link `json:"responsible,omitempty"`
+			Status      *external.Link `json:"status,omitempty"`
+			Type        *external.Link `json:"type,omitempty"`
+			Version     *external.Link `json:"version,omitempty"`
+		}{
+			Parent: &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/work_packages/%d", args.ParentID))},
+		},
+	}
+
+	resp, err = r.client.APIClient().UpdateWorkPackage(ctx, args.WorkPackageID, nil, body)
+	if err != nil {
+		return errorResult("Failed to set parent: %v", err), nil
+	}
+	if err := openproject.ReadResponse(resp, nil); err != nil {
+		return errorResult("Failed to set parent: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Work package #%d parent set to #%d", args.WorkPackageID, args.ParentID)), nil
 }
 
 func (r *Registry) removeWorkPackageParent(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args RemoveWorkPackageParentArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	_, err := r.client.RemoveWorkPackageParent(ctx, args.WorkPackageID)
+	// Need to fetch current WP to get lockVersion
+	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.WorkPackageID, nil)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to remove parent: %v", err)}}}, nil
+		return errorResult("Failed to fetch work package: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Parent removed from work package #%d", args.WorkPackageID)}}}, nil
+	var current external.WorkPackageModel
+	if err := openproject.ReadResponse(resp, &current); err != nil {
+		return errorResult("Failed to fetch work package: %v", err), nil
+	}
+
+	lockVersion := 0
+	if current.LockVersion != nil {
+		lockVersion = *current.LockVersion
+	}
+
+	body := external.WorkPackagePatchModel{
+		LockVersion: lockVersion,
+		UnderscoreLinks: &struct {
+			Assignee    *external.Link `json:"assignee,omitempty"`
+			Category    *external.Link `json:"category,omitempty"`
+			Parent      *external.Link `json:"parent,omitempty"`
+			Priority    *external.Link `json:"priority,omitempty"`
+			Project     *external.Link `json:"project,omitempty"`
+			Responsible *external.Link `json:"responsible,omitempty"`
+			Status      *external.Link `json:"status,omitempty"`
+			Type        *external.Link `json:"type,omitempty"`
+			Version     *external.Link `json:"version,omitempty"`
+		}{
+			Parent: &external.Link{},
+		},
+	}
+
+	resp, err = r.client.APIClient().UpdateWorkPackage(ctx, args.WorkPackageID, nil, body)
+	if err != nil {
+		return errorResult("Failed to remove parent: %v", err), nil
+	}
+	if err := openproject.ReadResponse(resp, nil); err != nil {
+		return errorResult("Failed to remove parent: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Parent removed from work package #%d", args.WorkPackageID)), nil
 }
 
 func (r *Registry) listWorkPackageChildren(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListWorkPackageChildrenArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	list, err := r.client.ListWorkPackageChildren(ctx, args.WorkPackageID)
+	// Use filters on work packages list with parent filter
+	params := &external.ListWorkPackagesParams{
+		Filters: strPtr(fmt.Sprintf(`[{"parent":{"operator":"=","values":["%d"]}}]`, args.WorkPackageID)),
+	}
+	resp, err := r.client.APIClient().ListWorkPackages(ctx, params)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list children: %v", err)}}}, nil
+		return errorResult("Failed to list children: %v", err), nil
+	}
+
+	var list external.WorkPackagesModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list children: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d children:\n\n", list.Total)
-	for _, wp := range list.Embedded.Elements {
-		result += fmt.Sprintf("- #%d %s\n", wp.ID, wp.Subject)
+	for _, wp := range list.UnderscoreEmbedded.Elements {
+		result += fmt.Sprintf("- #%d %s\n", derefInt(wp.Id), wp.Subject)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) createWorkPackageRelation(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args CreateWorkPackageRelationArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.CreateRelationOptions{FromID: args.FromID, ToID: args.ToID, Type: args.Type, Description: args.Description, Delay: args.Delay}
-	rel, err := r.client.CreateRelation(ctx, opts)
-	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to create relation: %v", err)}}}, nil
+	body := external.RelationWriteModel{
+		Type: external.RelationWriteModelType(args.Type),
+		UnderscoreLinks: struct {
+			To *external.Link `json:"to,omitempty"`
+		}{
+			To: &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/work_packages/%d", args.ToID))},
+		},
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Relation #%d created: %s (#%d → #%d)", rel.ID, args.Type, args.FromID, args.ToID)}}}, nil
+	if args.Description != "" {
+		body.Description = strPtr(args.Description)
+	}
+	if args.Delay > 0 {
+		body.Lag = intPtr(args.Delay)
+	}
+
+	resp, err := r.client.APIClient().CreateRelation(ctx, args.FromID, body)
+	if err != nil {
+		return errorResult("Failed to create relation: %v", err), nil
+	}
+	var rel external.RelationReadModel
+	if err := openproject.ReadResponse(resp, &rel); err != nil {
+		return errorResult("Failed to create relation: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Relation #%d created: %s (#%d → #%d)", derefInt(rel.Id), args.Type, args.FromID, args.ToID)), nil
 }
 
 func (r *Registry) listWorkPackageRelations(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args ListWorkPackageRelationsArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	list, err := r.client.ListWorkPackageRelations(ctx, args.WorkPackageID)
+	params := &external.ListRelationsParams{
+		Filters: strPtr(fmt.Sprintf(`[{"involved":{"operator":"=","values":["%d"]}}]`, args.WorkPackageID)),
+	}
+	resp, err := r.client.APIClient().ListRelations(ctx, params)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to list relations: %v", err)}}}, nil
+		return errorResult("Failed to list relations: %v", err), nil
+	}
+
+	var list external.RelationCollectionModel
+	if err := openproject.ReadResponse(resp, &list); err != nil {
+		return errorResult("Failed to list relations: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d relations:\n\n", list.Total)
-	for _, rel := range list.Embedded.Elements {
-		result += fmt.Sprintf("- #%d: %s\n", rel.ID, rel.Type)
+	for _, rel := range list.UnderscoreEmbedded.Elements {
+		result += fmt.Sprintf("- #%d: %s\n", derefInt(rel.Id), string(derefStr((*string)(rel.Type))))
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result}}}, nil
+	return textResult(result), nil
 }
 
 func (r *Registry) getWorkPackageRelation(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args GetWorkPackageRelationArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	rel, err := r.client.GetRelation(ctx, args.ID)
+	resp, err := r.client.APIClient().GetRelation(ctx, args.ID)
 	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to get relation: %v", err)}}}, nil
+		return errorResult("Failed to get relation: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Relation #%d: %s", rel.ID, rel.Type)}}}, nil
+	var rel external.RelationReadModel
+	if err := openproject.ReadResponse(resp, &rel); err != nil {
+		return errorResult("Failed to get relation: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Relation #%d: %s", derefInt(rel.Id), string(derefStr((*string)(rel.Type))))), nil
 }
 
 func (r *Registry) updateWorkPackageRelation(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args UpdateWorkPackageRelationArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	opts := &openproject.UpdateRelationOptions{Type: args.Type, Description: args.Description, Delay: args.Delay}
-	rel, err := r.client.UpdateRelation(ctx, args.ID, opts)
-	if err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to update relation: %v", err)}}}, nil
+	body := external.RelationWriteModel{}
+	if args.Type != "" {
+		body.Type = external.RelationWriteModelType(args.Type)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Relation #%d updated successfully!", rel.ID)}}}, nil
+	if args.Description != "" {
+		body.Description = strPtr(args.Description)
+	}
+	if args.Delay > 0 {
+		body.Lag = intPtr(args.Delay)
+	}
+
+	resp, err := r.client.APIClient().UpdateRelation(ctx, args.ID, body)
+	if err != nil {
+		return errorResult("Failed to update relation: %v", err), nil
+	}
+	var rel external.RelationReadModel
+	if err := openproject.ReadResponse(resp, &rel); err != nil {
+		return errorResult("Failed to update relation: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Relation #%d updated successfully!", derefInt(rel.Id))), nil
 }
 
 func (r *Registry) deleteWorkPackageRelation(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var args DeleteWorkPackageRelationArgs
 	if err := parseArgs(req.Params.Arguments, &args); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Invalid arguments: %v", err)}}}, nil
+		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	if err := r.client.DeleteRelation(ctx, args.ID); err != nil {
-		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to delete relation: %v", err)}}}, nil
+	resp, err := r.client.APIClient().DeleteRelation(ctx, args.ID)
+	if err != nil {
+		return errorResult("Failed to delete relation: %v", err), nil
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Relation #%d deleted successfully!", args.ID)}}}, nil
+	if err := openproject.ReadResponse(resp, nil); err != nil {
+		return errorResult("Failed to delete relation: %v", err), nil
+	}
+	return textResult(fmt.Sprintf("Relation #%d deleted successfully!", args.ID)), nil
 }
