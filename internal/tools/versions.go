@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	external "github.com/pinealctx/openproject"
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
 type ListVersionsArgs struct{ ProjectID int }
@@ -45,7 +45,6 @@ func (r *Registry) listVersions(ctx context.Context, req *mcp.CallToolRequest) (
 
 	// ListVersionsAvailableInAProject returns versions for a project
 	resp, err := r.client.APIClient().ListVersionsAvailableInAProject(ctx, args.ProjectID)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list versions: %v", err), nil
 	}
@@ -88,7 +87,6 @@ func (r *Registry) createVersion(ctx context.Context, req *mcp.CallToolRequest) 
 	}
 
 	resp, err := r.client.APIClient().CreateVersion(ctx, body)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create version: %v", err), nil
 	}

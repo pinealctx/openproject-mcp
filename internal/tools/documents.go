@@ -6,7 +6,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
-	external "github.com/pinealctx/openproject"
 )
 
 type ListDocumentsArgs struct {
@@ -23,15 +22,6 @@ type UpdateDocumentArgs struct {
 	ID          int    `json:"id"`
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
-}
-
-// documentCollection is a minimal HAL collection for documents.
-type documentCollection struct {
-	Embedded struct {
-		Elements []external.DocumentModel `json:"elements"`
-	} `json:"_embedded"`
-	Count int `json:"count"`
-	Total int `json:"total"`
 }
 
 func (r *Registry) registerDocumentTools(server *mcp.Server) {
@@ -67,24 +57,12 @@ func (r *Registry) listDocuments(ctx context.Context, req *mcp.CallToolRequest) 
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	params := &external.ListDocumentsParams{}
-	if args.Offset > 0 {
-		params.Offset = intPtr(args.Offset)
-	}
-	if args.PageSize > 0 {
-		params.PageSize = intPtr(args.PageSize)
-	}
-	if args.SortBy != "" {
-		params.SortBy = strPtr(normalizeSortBy(args.SortBy))
-	}
-
-	resp, err := r.client.APIClient().ListDocuments(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
+	list, err := r.client.ListDocuments(ctx, openproject.DocumentListInput{
+		Offset:   args.Offset,
+		PageSize: args.PageSize,
+		SortBy:   normalizeSortBy(args.SortBy),
+	})
 	if err != nil {
-		return errorResult("Failed to list documents: %v", err), nil
-	}
-	var list documentCollection
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list documents: %v", err), nil
 	}
 
@@ -115,13 +93,8 @@ func (r *Registry) getDocument(ctx context.Context, req *mcp.CallToolRequest) (*
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().ViewDocument(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
+	doc, err := r.client.GetDocument(ctx, args.ID)
 	if err != nil {
-		return errorResult("Failed to get document: %v", err), nil
-	}
-	var doc external.DocumentModel
-	if err := openproject.ReadResponse(resp, &doc); err != nil {
 		return errorResult("Failed to get document: %v", err), nil
 	}
 
@@ -145,25 +118,12 @@ func (r *Registry) updateDocument(ctx context.Context, req *mcp.CallToolRequest)
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	body := external.UpdateDocumentJSONRequestBody{}
-	if args.Title != "" {
-		body.Title = strPtr(args.Title)
-	}
-	if args.Description != "" {
-		body.Description = &struct {
-			Raw *string `json:"raw,omitempty"`
-		}{
-			Raw: strPtr(args.Description),
-		}
-	}
-
-	resp, err := r.client.APIClient().UpdateDocument(ctx, args.ID, body)
-	defer func() { _ = resp.Body.Close() }()
+	doc, err := r.client.UpdateDocument(ctx, openproject.DocumentUpdateInput{
+		ID:          args.ID,
+		Title:       args.Title,
+		Description: args.Description,
+	})
 	if err != nil {
-		return errorResult("Failed to update document: %v", err), nil
-	}
-	var doc external.DocumentModel
-	if err := openproject.ReadResponse(resp, &doc); err != nil {
 		return errorResult("Failed to update document: %v", err), nil
 	}
 

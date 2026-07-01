@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	external "github.com/pinealctx/openproject"
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
 type ListQueriesArgs struct {
@@ -54,7 +54,6 @@ func (r *Registry) listQueries(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 
 	resp, err := r.client.APIClient().ListQueries(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list queries: %v", err), nil
 	}
@@ -91,7 +90,6 @@ func (r *Registry) getQuery(ctx context.Context, req *mcp.CallToolRequest) (*mcp
 	}
 
 	resp, err := r.client.APIClient().ViewQuery(ctx, args.ID, nil)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get query: %v", err), nil
 	}

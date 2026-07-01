@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
-	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -65,23 +64,13 @@ var membershipListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List memberships",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		api := getClient().APIClient()
-		params := &external.ListMembershipsParams{}
-
-		if membershipListProjectID > 0 {
-			filter := fmt.Sprintf(`[{"project":{"operator":"=","values":["%d"]}}]`, membershipListProjectID)
-			params.Filters = ptr(filter)
-		}
-
-		resp, err := api.ListMemberships(getContext(), params)
+		result, err := getClient().ListMemberships(getContext(), openproject.MembershipListInput{
+			ProjectID: membershipListProjectID,
+		})
 		if err != nil {
 			return err
 		}
-		var result external.MembershipCollectionModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -94,16 +83,11 @@ var membershipGetCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid membership ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		resp, err := api.GetMembership(getContext(), id)
+		result, err := getClient().GetMembership(getContext(), id)
 		if err != nil {
 			return err
 		}
-		var result external.MembershipReadModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -112,26 +96,15 @@ var membershipCreateCmd = &cobra.Command{
 	Short: "Add user to project",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		roleIDs := parseRoleIDs(membershipCreateRoles)
-		roleLinks := make([]external.Link, len(roleIDs))
-		for i, rid := range roleIDs {
-			roleLinks[i] = external.Link{Href: ptr(fmt.Sprintf("/api/v3/roles/%d", rid))}
-		}
-
-		body := external.MembershipWriteModel{}
-		body.UnderscoreLinks.Principal = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/users/%d", membershipCreateUserID))}
-		body.UnderscoreLinks.Project = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/projects/%d", membershipCreateProjectID))}
-		body.UnderscoreLinks.Roles = &roleLinks
-
-		api := getClient().APIClient()
-		resp, err := api.CreateMembership(getContext(), body)
+		result, err := getClient().CreateMembership(getContext(), openproject.MembershipCreateInput{
+			ProjectID:   membershipCreateProjectID,
+			PrincipalID: membershipCreateUserID,
+			RoleIDs:     roleIDs,
+		})
 		if err != nil {
 			return err
 		}
-		var result external.MembershipReadModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -145,24 +118,15 @@ var membershipUpdateCmd = &cobra.Command{
 			return fmt.Errorf("invalid membership ID: %s", args[0])
 		}
 		roleIDs := parseRoleIDs(membershipUpdateRoles)
-		roleLinks := make([]external.Link, len(roleIDs))
-		for i, rid := range roleIDs {
-			roleLinks[i] = external.Link{Href: ptr(fmt.Sprintf("/api/v3/roles/%d", rid))}
-		}
 
-		body := external.MembershipWriteModel{}
-		body.UnderscoreLinks.Roles = &roleLinks
-
-		api := getClient().APIClient()
-		resp, err := api.UpdateMembership(getContext(), id, body)
+		result, err := getClient().UpdateMembership(getContext(), openproject.MembershipUpdateInput{
+			ID:      id,
+			RoleIDs: roleIDs,
+		})
 		if err != nil {
 			return err
 		}
-		var result external.MembershipReadModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -175,12 +139,7 @@ var membershipDeleteCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid membership ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		resp, err := api.DeleteMembership(getContext(), id)
-		if err != nil {
-			return err
-		}
-		if err := openproject.ReadResponse(resp, nil); err != nil {
+		if err := getClient().DeleteMembership(getContext(), id); err != nil {
 			return err
 		}
 		fmt.Println("Membership removed successfully")

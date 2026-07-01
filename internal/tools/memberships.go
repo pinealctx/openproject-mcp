@@ -7,7 +7,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
-	external "github.com/pinealctx/openproject"
 )
 
 type ListMembershipsArgs struct {
@@ -82,19 +81,10 @@ func (r *Registry) listMemberships(ctx context.Context, req *mcp.CallToolRequest
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	params := &external.ListMembershipsParams{}
-	if args.ProjectID > 0 {
-		params.Filters = strPtr(fmt.Sprintf(`[{"project":{"operator":"=","values":["%d"]}}]`, args.ProjectID))
-	}
-
-	resp, err := r.client.APIClient().ListMemberships(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
+	list, err := r.client.ListMemberships(ctx, openproject.MembershipListInput{
+		ProjectID: args.ProjectID,
+	})
 	if err != nil {
-		return errorResult("Failed to list memberships: %v", err), nil
-	}
-
-	var list external.MembershipCollectionModel
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list memberships: %v", err), nil
 	}
 
@@ -125,13 +115,8 @@ func (r *Registry) getMembership(ctx context.Context, req *mcp.CallToolRequest) 
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().GetMembership(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
+	m, err := r.client.GetMembership(ctx, args.ID)
 	if err != nil {
-		return errorResult("Failed to get membership: %v", err), nil
-	}
-	var m external.MembershipReadModel
-	if err := openproject.ReadResponse(resp, &m); err != nil {
 		return errorResult("Failed to get membership: %v", err), nil
 	}
 
@@ -162,30 +147,12 @@ func (r *Registry) createMembership(ctx context.Context, req *mcp.CallToolReques
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	roleLinks := make([]external.Link, len(args.RoleIDs))
-	for i, rid := range args.RoleIDs {
-		roleLinks[i] = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/roles/%d", rid))}
-	}
-
-	body := external.MembershipWriteModel{
-		UnderscoreLinks: struct {
-			Principal *external.Link   `json:"principal,omitempty"`
-			Project   *external.Link   `json:"project,omitempty"`
-			Roles     *[]external.Link `json:"roles,omitempty"`
-		}{
-			Principal: &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/users/%d", args.Principal))},
-			Project:   &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/projects/%d", args.ProjectID))},
-			Roles:     &roleLinks,
-		},
-	}
-
-	resp, err := r.client.APIClient().CreateMembership(ctx, body)
-	defer func() { _ = resp.Body.Close() }()
+	m, err := r.client.CreateMembership(ctx, openproject.MembershipCreateInput{
+		ProjectID:   args.ProjectID,
+		PrincipalID: args.Principal,
+		RoleIDs:     args.RoleIDs,
+	})
 	if err != nil {
-		return errorResult("Failed to create membership: %v", err), nil
-	}
-	var m external.MembershipReadModel
-	if err := openproject.ReadResponse(resp, &m); err != nil {
 		return errorResult("Failed to create membership: %v", err), nil
 	}
 	return textResult(fmt.Sprintf("Membership #%d created successfully!", m.Id)), nil
@@ -197,28 +164,11 @@ func (r *Registry) updateMembership(ctx context.Context, req *mcp.CallToolReques
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	roleLinks := make([]external.Link, len(args.RoleIDs))
-	for i, rid := range args.RoleIDs {
-		roleLinks[i] = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/roles/%d", rid))}
-	}
-
-	body := external.MembershipWriteModel{
-		UnderscoreLinks: struct {
-			Principal *external.Link   `json:"principal,omitempty"`
-			Project   *external.Link   `json:"project,omitempty"`
-			Roles     *[]external.Link `json:"roles,omitempty"`
-		}{
-			Roles: &roleLinks,
-		},
-	}
-
-	resp, err := r.client.APIClient().UpdateMembership(ctx, args.ID, body)
-	defer func() { _ = resp.Body.Close() }()
+	m, err := r.client.UpdateMembership(ctx, openproject.MembershipUpdateInput{
+		ID:      args.ID,
+		RoleIDs: args.RoleIDs,
+	})
 	if err != nil {
-		return errorResult("Failed to update membership: %v", err), nil
-	}
-	var m external.MembershipReadModel
-	if err := openproject.ReadResponse(resp, &m); err != nil {
 		return errorResult("Failed to update membership: %v", err), nil
 	}
 	return textResult(fmt.Sprintf("Membership #%d updated successfully!", m.Id)), nil
@@ -230,12 +180,7 @@ func (r *Registry) deleteMembership(ctx context.Context, req *mcp.CallToolReques
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().DeleteMembership(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
-	if err != nil {
-		return errorResult("Failed to delete membership: %v", err), nil
-	}
-	if err := openproject.ReadResponse(resp, nil); err != nil {
+	if err := r.client.DeleteMembership(ctx, args.ID); err != nil {
 		return errorResult("Failed to delete membership: %v", err), nil
 	}
 	return textResult(fmt.Sprintf("Membership #%d deleted successfully!", args.ID)), nil
@@ -247,18 +192,10 @@ func (r *Registry) listProjectMembers(ctx context.Context, req *mcp.CallToolRequ
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	params := &external.ListMembershipsParams{
-		Filters: strPtr(fmt.Sprintf(`[{"project":{"operator":"=","values":["%d"]}}]`, args.ProjectID)),
-	}
-
-	resp, err := r.client.APIClient().ListMemberships(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
+	list, err := r.client.ListMemberships(ctx, openproject.MembershipListInput{
+		ProjectID: args.ProjectID,
+	})
 	if err != nil {
-		return errorResult("Failed to list project members: %v", err), nil
-	}
-
-	var list external.MembershipCollectionModel
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list project members: %v", err), nil
 	}
 
@@ -278,15 +215,8 @@ func (r *Registry) listProjectMembers(ctx context.Context, req *mcp.CallToolRequ
 }
 
 func (r *Registry) listRoles(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	resp, err := r.client.APIClient().ListRoles(ctx, nil)
-	defer func() { _ = resp.Body.Close() }()
+	raw, err := r.client.ListRolesRaw(ctx)
 	if err != nil {
-		return errorResult("Failed to list roles: %v", err), nil
-	}
-
-	// ListRoles returns an indeterminate model; read raw and try to parse
-	var raw map[string]interface{}
-	if err := openproject.ReadResponseRawTo(resp, &raw); err != nil {
 		return errorResult("Failed to list roles: %v", err), nil
 	}
 
@@ -312,13 +242,8 @@ func (r *Registry) getRole(ctx context.Context, req *mcp.CallToolRequest) (*mcp.
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().ViewRole(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
+	role, err := r.client.GetRole(ctx, args.ID)
 	if err != nil {
-		return errorResult("Failed to get role: %v", err), nil
-	}
-	var role external.RoleModel
-	if err := openproject.ReadResponse(resp, &role); err != nil {
 		return errorResult("Failed to get role: %v", err), nil
 	}
 

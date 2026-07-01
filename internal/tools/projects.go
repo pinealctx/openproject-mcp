@@ -6,7 +6,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
-	external "github.com/pinealctx/openproject"
 )
 
 type ListProjectsArgs struct {
@@ -79,22 +78,12 @@ func (r *Registry) listProjects(ctx context.Context, req *mcp.CallToolRequest) (
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	params := &external.ListProjectsParams{}
-	if args.SortBy != "" {
-		params.SortBy = strPtr(normalizeSortBy(args.SortBy))
-	}
-	if args.Filters != "" {
-		params.Filters = strPtr(args.Filters)
-	}
-
-	resp, err := r.client.APIClient().ListProjects(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
+	projects, err := r.client.ListProjects(ctx, openproject.ProjectListInput{
+		SortBy:  normalizeSortBy(args.SortBy),
+		Filters: args.Filters,
+	})
 	if err != nil {
 		return errorResult("Failed to list projects: %v", err), nil
-	}
-	var projects external.ProjectCollectionModel
-	if err := openproject.ReadResponse(resp, &projects); err != nil {
-		return errorResult("Failed to parse projects: %v", err), nil
 	}
 
 	result := fmt.Sprintf("Found %d projects:\n\n", projects.Total)
@@ -115,16 +104,11 @@ func (r *Registry) getProject(ctx context.Context, req *mcp.CallToolRequest) (*m
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().ViewProject(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
+	project, err := r.client.GetProject(ctx, args.ID)
 	if err != nil {
 		return errorResult("Failed to get project: %v", err), nil
 	}
-	var project external.ProjectModel
-	if err := openproject.ReadResponse(resp, &project); err != nil {
-		return errorResult("Failed to parse project: %v", err), nil
-	}
-	return textResult(formatProject(&project)), nil
+	return textResult(formatProject(project)), nil
 }
 
 func (r *Registry) createProject(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -133,27 +117,14 @@ func (r *Registry) createProject(ctx context.Context, req *mcp.CallToolRequest) 
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	body := external.ProjectModel{
-		Name:       &args.Name,
-		Identifier: &args.Identifier,
-		Public:     &args.Public,
-	}
-	if args.Description != "" {
-		fmt := external.FormattableFormat("markdown")
-		body.Description = &external.Formattable{
-			Format: &fmt,
-			Raw:    &args.Description,
-		}
-	}
-
-	resp, err := r.client.APIClient().CreateProject(ctx, body)
-	defer func() { _ = resp.Body.Close() }()
+	project, err := r.client.CreateProject(ctx, openproject.ProjectCreateInput{
+		Name:        args.Name,
+		Identifier:  args.Identifier,
+		Description: args.Description,
+		Public:      args.Public,
+	})
 	if err != nil {
 		return errorResult("Failed to create project: %v", err), nil
-	}
-	var project external.ProjectModel
-	if err := openproject.ReadResponse(resp, &project); err != nil {
-		return errorResult("Failed to parse created project: %v", err), nil
 	}
 
 	result := "Project created successfully!\n\n"
@@ -169,27 +140,15 @@ func (r *Registry) updateProject(ctx context.Context, req *mcp.CallToolRequest) 
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	body := external.ProjectModel{
-		Name:   strPtr(args.Name),
-		Public: args.Public,
-		Active: args.Active,
-	}
-	if args.Description != "" {
-		fmt := external.FormattableFormat("markdown")
-		body.Description = &external.Formattable{
-			Format: &fmt,
-			Raw:    &args.Description,
-		}
-	}
-
-	resp, err := r.client.APIClient().UpdateProject(ctx, args.ID, body)
-	defer func() { _ = resp.Body.Close() }()
+	project, err := r.client.UpdateProject(ctx, openproject.ProjectUpdateInput{
+		ID:          args.ID,
+		Name:        args.Name,
+		Description: args.Description,
+		Public:      args.Public,
+		Active:      args.Active,
+	})
 	if err != nil {
 		return errorResult("Failed to update project: %v", err), nil
-	}
-	var project external.ProjectModel
-	if err := openproject.ReadResponse(resp, &project); err != nil {
-		return errorResult("Failed to parse updated project: %v", err), nil
 	}
 	return textResult(fmt.Sprintf("Project %d updated successfully!\n\nName: %s", derefInt(project.Id), derefStr(project.Name))), nil
 }
@@ -200,12 +159,7 @@ func (r *Registry) deleteProject(ctx context.Context, req *mcp.CallToolRequest) 
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().DeleteProject(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
-	if err != nil {
-		return errorResult("Failed to delete project: %v", err), nil
-	}
-	if err := openproject.ReadResponse(resp, nil); err != nil {
+	if err := r.client.DeleteProject(ctx, args.ID); err != nil {
 		return errorResult("Failed to delete project: %v", err), nil
 	}
 	return textResult(fmt.Sprintf("Project %d deleted successfully!", args.ID)), nil

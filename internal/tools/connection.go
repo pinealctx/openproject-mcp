@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	external "github.com/pinealctx/openproject"
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
 func (r *Registry) registerConnectionTools(server *mcp.Server) {
@@ -68,7 +68,6 @@ func (r *Registry) getCurrentUser(ctx context.Context, req *mcp.CallToolRequest)
 
 func (r *Registry) getAPIInfo(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resp, err := r.client.APIClient().ViewRoot(ctx)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to get API info: %v", err), nil
 	}

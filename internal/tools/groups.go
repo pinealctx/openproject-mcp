@@ -6,7 +6,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
-	external "github.com/pinealctx/openproject"
 )
 
 type ListGroupsArgs struct {
@@ -74,18 +73,10 @@ func (r *Registry) listGroups(ctx context.Context, req *mcp.CallToolRequest) (*m
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	params := &external.ListGroupsParams{}
-	if args.SortBy != "" {
-		params.SortBy = strPtr(normalizeSortBy(args.SortBy))
-	}
-
-	resp, err := r.client.APIClient().ListGroups(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
+	list, err := r.client.ListGroups(ctx, openproject.GroupListInput{
+		SortBy: normalizeSortBy(args.SortBy),
+	})
 	if err != nil {
-		return errorResult("Failed to list groups: %v", err), nil
-	}
-	var list external.GroupCollectionModel
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list groups: %v", err), nil
 	}
 
@@ -110,13 +101,8 @@ func (r *Registry) getGroup(ctx context.Context, req *mcp.CallToolRequest) (*mcp
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().GetGroup(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
+	group, err := r.client.GetGroup(ctx, args.ID)
 	if err != nil {
-		return errorResult("Failed to get group: %v", err), nil
-	}
-	var group external.GroupModel
-	if err := openproject.ReadResponse(resp, &group); err != nil {
 		return errorResult("Failed to get group: %v", err), nil
 	}
 
@@ -143,17 +129,10 @@ func (r *Registry) createGroup(ctx context.Context, req *mcp.CallToolRequest) (*
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	body := external.GroupWriteModel{
-		Name: strPtr(args.Name),
-	}
-
-	resp, err := r.client.APIClient().CreateGroup(ctx, body)
-	defer func() { _ = resp.Body.Close() }()
+	group, err := r.client.CreateGroup(ctx, openproject.GroupCreateInput{
+		Name: args.Name,
+	})
 	if err != nil {
-		return errorResult("Failed to create group: %v", err), nil
-	}
-	var group external.GroupModel
-	if err := openproject.ReadResponse(resp, &group); err != nil {
 		return errorResult("Failed to create group: %v", err), nil
 	}
 
@@ -166,18 +145,11 @@ func (r *Registry) updateGroup(ctx context.Context, req *mcp.CallToolRequest) (*
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	body := external.GroupWriteModel{}
-	if args.Name != "" {
-		body.Name = strPtr(args.Name)
-	}
-
-	resp, err := r.client.APIClient().UpdateGroup(ctx, args.ID, body)
-	defer func() { _ = resp.Body.Close() }()
+	group, err := r.client.UpdateGroup(ctx, openproject.GroupUpdateInput{
+		ID:   args.ID,
+		Name: args.Name,
+	})
 	if err != nil {
-		return errorResult("Failed to update group: %v", err), nil
-	}
-	var group external.GroupModel
-	if err := openproject.ReadResponse(resp, &group); err != nil {
 		return errorResult("Failed to update group: %v", err), nil
 	}
 
@@ -190,12 +162,7 @@ func (r *Registry) deleteGroup(ctx context.Context, req *mcp.CallToolRequest) (*
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().DeleteGroup(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
-	if err != nil {
-		return errorResult("Failed to delete group: %v", err), nil
-	}
-	if err := openproject.ReadResponse(resp, nil); err != nil {
+	if err := r.client.DeleteGroup(ctx, args.ID); err != nil {
 		return errorResult("Failed to delete group: %v", err), nil
 	}
 

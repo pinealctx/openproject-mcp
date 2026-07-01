@@ -79,6 +79,9 @@ func (c *Client) APIClient() *external.Client {
 // ReadResponse reads and unmarshals an HTTP response body into target.
 // Returns an APIError for non-2xx status codes.
 func ReadResponse(resp *http.Response, target any) error {
+	if resp == nil {
+		return fmt.Errorf("response is nil")
+	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -90,10 +93,10 @@ func ReadResponse(resp *http.Response, target any) error {
 			apiErr.Message = string(body)
 		}
 		return &APIError{
-			StatusCode:    resp.StatusCode,
-			Message:       apiErr.Message,
-			ErrorID:       apiErr.ErrorIdentifier,
-			ResponseBody:  string(body),
+			StatusCode:   resp.StatusCode,
+			Message:      apiErr.Message,
+			ErrorID:      apiErr.ErrorIdentifier,
+			ResponseBody: string(body),
 		}
 	}
 	if target != nil && len(body) > 0 {
@@ -104,8 +107,19 @@ func ReadResponse(resp *http.Response, target any) error {
 	return nil
 }
 
+// DecodeResponse checks a generated-client call error, then reads and closes the response.
+func DecodeResponse(resp *http.Response, err error, target any) error {
+	if err != nil {
+		return err
+	}
+	return ReadResponse(resp, target)
+}
+
 // ReadResponseRaw reads the response body as bytes without unmarshaling.
 func ReadResponseRaw(resp *http.Response) ([]byte, error) {
+	if resp == nil {
+		return nil, fmt.Errorf("response is nil")
+	}
 	defer func() { _ = resp.Body.Close() }()
 	return io.ReadAll(resp.Body)
 }
@@ -113,6 +127,9 @@ func ReadResponseRaw(resp *http.Response) ([]byte, error) {
 // ReadResponseRawTo reads the response and unmarshals into target, handling non-2xx as error.
 // This is similar to ReadResponse but works with raw map[string]interface{} types.
 func ReadResponseRawTo(resp *http.Response, target any) error {
+	if resp == nil {
+		return fmt.Errorf("response is nil")
+	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -160,11 +177,9 @@ func (c *Client) TestConnection(ctx context.Context) (*external.UserModel, error
 		Filters:  ptr(`[{"status":{"operator":"!","values":["*"]}}]`),
 		PageSize: ptr(1),
 	})
-	if err != nil {
+	if err := DecodeResponse(resp, err, nil); err != nil {
 		return nil, err
 	}
-	// Just check we can reach the API; close body immediately.
-	_ = resp.Body.Close()
 	return c.GetCurrentUser(ctx)
 }
 
@@ -183,7 +198,6 @@ func (c *Client) GetAPIRoot(ctx context.Context) (*external.RootModel, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
 	var root external.RootModel
 	if err := ReadResponse(resp, &root); err != nil {
 		return nil, err
@@ -214,7 +228,6 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
 	return ReadResponse(resp, result)
 }
 

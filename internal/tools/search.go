@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	external "github.com/pinealctx/openproject"
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
 type SearchArgs struct {
@@ -44,7 +44,6 @@ func (r *Registry) search(ctx context.Context, req *mcp.CallToolRequest) (*mcp.C
 			Filters: strPtr(fmt.Sprintf(`[{"name_and_identifier":{"operator":"~","values":["%s"]}}]`, args.Query)),
 		}
 		resp, err := r.client.APIClient().ListProjects(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
 		if err != nil {
 			return errorResult("Search failed: %v", err), nil
 		}
@@ -64,7 +63,6 @@ func (r *Registry) search(ctx context.Context, req *mcp.CallToolRequest) (*mcp.C
 			Filters:  strPtr(fmt.Sprintf(`[{"subject":{"operator":"~","values":["%s"]}}]`, args.Query)),
 		}
 		resp, err := r.client.APIClient().ListWorkPackages(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
 		if err != nil {
 			return errorResult("Search failed: %v", err), nil
 		}
@@ -88,7 +86,6 @@ func (r *Registry) search(ctx context.Context, req *mcp.CallToolRequest) (*mcp.C
 			Filters:  strPtr(fmt.Sprintf(`[{"name":{"operator":"~","values":["%s"]}}]`, args.Query)),
 		}
 		resp, err := r.client.APIClient().ListUsers(ctx, params)
-	defer func() { _ = resp.Body.Close() }()
 		if err != nil {
 			return errorResult("Search failed: %v", err), nil
 		}

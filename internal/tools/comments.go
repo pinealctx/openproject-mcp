@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	external "github.com/pinealctx/openproject"
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
 type ListWorkPackageActivitiesArgs struct {
@@ -31,16 +31,16 @@ type activityCollection struct {
 
 // activityElement represents a single activity/comment in a collection.
 type activityElement struct {
-	ID        *int              `json:"id,omitempty"`
-	Type      *string           `json:"_type,omitempty"`
+	ID        *int                  `json:"id,omitempty"`
+	Type      *string               `json:"_type,omitempty"`
 	Comment   *external.Formattable `json:"comment,omitempty"`
-	Details   []any             `json:"details,omitempty"`
-	CreatedAt *time.Time        `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time        `json:"updatedAt,omitempty"`
-	Internal  *bool             `json:"internal,omitempty"`
+	Details   []any                 `json:"details,omitempty"`
+	CreatedAt *time.Time            `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time            `json:"updatedAt,omitempty"`
+	Internal  *bool                 `json:"internal,omitempty"`
 	Links     *struct {
-		Self   *external.Link `json:"self,omitempty"`
-		User   *external.Link `json:"user,omitempty"`
+		Self *external.Link `json:"self,omitempty"`
+		User *external.Link `json:"user,omitempty"`
 	} `json:"_links,omitempty"`
 }
 
@@ -69,7 +69,6 @@ func (r *Registry) listWorkPackageActivities(ctx context.Context, req *mcp.CallT
 	}
 
 	resp, err := r.client.APIClient().ListWorkPackageActivities(ctx, args.WorkPackageID)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list activities: %v", err), nil
 	}
@@ -125,7 +124,6 @@ func (r *Registry) createWorkPackageComment(ctx context.Context, req *mcp.CallTo
 	}
 
 	resp, err := r.client.APIClient().CommentWorkPackage(ctx, args.WorkPackageID, nil, body)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to create comment: %v", err), nil
 	}

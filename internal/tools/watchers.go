@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	external "github.com/pinealctx/openproject"
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
 type ListWorkPackageWatchersArgs struct {
@@ -55,7 +55,6 @@ func (r *Registry) listWorkPackageWatchers(ctx context.Context, req *mcp.CallToo
 	}
 
 	resp, err := r.client.APIClient().ListWatchers(ctx, args.WorkPackageID)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to list watchers: %v", err), nil
 	}
@@ -93,7 +92,6 @@ func (r *Registry) addWorkPackageWatcher(ctx context.Context, req *mcp.CallToolR
 	}
 
 	resp, err := r.client.APIClient().AddWatcher(ctx, args.WorkPackageID, body)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to add watcher: %v", err), nil
 	}
@@ -111,7 +109,6 @@ func (r *Registry) removeWorkPackageWatcher(ctx context.Context, req *mcp.CallTo
 	}
 
 	resp, err := r.client.APIClient().RemoveWatcher(ctx, args.WorkPackageID, args.UserID)
-	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		return errorResult("Failed to remove watcher: %v", err), nil
 	}

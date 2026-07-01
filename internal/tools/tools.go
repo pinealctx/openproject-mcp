@@ -20,7 +20,7 @@ type ToolGroup struct {
 var toolGroups = map[string]ToolGroup{
 	// Default mode groups
 	"connection": {IsDefault: true, Tools: []string{"test_connection", "check_permissions", "get_current_user", "get_api_info"}},
-	"project":   {IsDefault: true, Tools: []string{"list_projects", "get_project", "create_project", "update_project", "delete_project"}},
+	"project":    {IsDefault: true, Tools: []string{"list_projects", "get_project", "create_project", "update_project", "delete_project"}},
 	"work_package": {IsDefault: true, Tools: []string{
 		"list_work_packages", "get_work_package", "create_work_package",
 		"update_work_package", "delete_work_package",
@@ -70,9 +70,9 @@ var toolGroups = map[string]ToolGroup{
 
 // Registry holds all tool registrations.
 type Registry struct {
-	client        *openproject.Client
-	toolMode      string // "default", "full", "custom"
-	enabledTools  map[string]bool
+	client       *openproject.Client
+	toolMode     string // "default", "full", "custom"
+	enabledTools map[string]bool
 }
 
 // schemaProps is a convenience alias for building property maps in newSchema.
@@ -126,8 +126,6 @@ func firstNonEmpty(values ...string) string {
 	}
 	return ""
 }
-
-
 
 // NewRegistry creates a new tool registry.
 func NewRegistry(client *openproject.Client) *Registry {

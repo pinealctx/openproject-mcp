@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
-	external "github.com/pinealctx/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -86,24 +85,14 @@ Examples:
   # Output as JSON
   openproject-mcp project list -o json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		api := getClient().APIClient()
-		params := &external.ListProjectsParams{}
-		if projectListSortBy != "" {
-			params.SortBy = ptr(normalizeSortBy(projectListSortBy))
-		}
-		if projectListFilters != "" {
-			params.Filters = ptr(projectListFilters)
-		}
-
-		resp, err := api.ListProjects(getContext(), params)
+		result, err := getClient().ListProjects(getContext(), openproject.ProjectListInput{
+			SortBy:  normalizeSortBy(projectListSortBy),
+			Filters: projectListFilters,
+		})
 		if err != nil {
 			return err
 		}
-		var result external.ProjectCollectionModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -116,16 +105,11 @@ var projectGetCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid project ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		resp, err := api.ViewProject(getContext(), id)
+		result, err := getClient().GetProject(getContext(), id)
 		if err != nil {
 			return err
 		}
-		var result external.ProjectModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -133,26 +117,16 @@ var projectCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		body := external.ProjectModel{
-			Identifier: ptr(projectCreateIdentifier),
-			Name:       ptr(projectCreateName),
-			Public:     ptr(projectCreatePublic),
-		}
-		if projectCreateDescription != "" {
-			fmt := external.FormattableFormat("markdown")
-			body.Description = &external.Formattable{Format: &fmt, Raw: ptr(projectCreateDescription)}
-		}
-
-		api := getClient().APIClient()
-		resp, err := api.CreateProject(getContext(), body)
+		result, err := getClient().CreateProject(getContext(), openproject.ProjectCreateInput{
+			Name:        projectCreateName,
+			Identifier:  projectCreateIdentifier,
+			Description: projectCreateDescription,
+			Public:      projectCreatePublic,
+		})
 		if err != nil {
 			return err
 		}
-		var result external.ProjectModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -165,31 +139,26 @@ var projectUpdateCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid project ID: %s", args[0])
 		}
-		body := external.ProjectModel{}
-		if projectUpdateName != "" {
-			body.Name = ptr(projectUpdateName)
-		}
-		if projectUpdateDescription != "" {
-			fmt := external.FormattableFormat("markdown")
-			body.Description = &external.Formattable{Format: &fmt, Raw: ptr(projectUpdateDescription)}
-		}
+		var public *bool
 		if cmd.Flags().Changed("public") {
-			body.Public = ptr(projectUpdatePublic)
+			public = ptr(projectUpdatePublic)
 		}
+		var active *bool
 		if cmd.Flags().Changed("active") {
-			body.Active = ptr(projectUpdateActive)
+			active = ptr(projectUpdateActive)
 		}
 
-		api := getClient().APIClient()
-		resp, err := api.UpdateProject(getContext(), id, body)
+		result, err := getClient().UpdateProject(getContext(), openproject.ProjectUpdateInput{
+			ID:          id,
+			Name:        projectUpdateName,
+			Description: projectUpdateDescription,
+			Public:      public,
+			Active:      active,
+		})
 		if err != nil {
 			return err
 		}
-		var result external.ProjectModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -202,12 +171,7 @@ var projectDeleteCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid project ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		resp, err := api.DeleteProject(getContext(), id)
-		if err != nil {
-			return err
-		}
-		if err := openproject.ReadResponse(resp, nil); err != nil {
+		if err := getClient().DeleteProject(getContext(), id); err != nil {
 			return err
 		}
 		fmt.Println("Project deleted successfully")

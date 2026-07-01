@@ -3,11 +3,9 @@ package tools
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
-	external "github.com/pinealctx/openproject"
 )
 
 // Work package argument types
@@ -143,47 +141,14 @@ func (r *Registry) listWorkPackages(ctx context.Context, req *mcp.CallToolReques
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	params := &external.ListWorkPackagesParams{}
-	if args.Offset > 0 {
-		params.Offset = intPtr(args.Offset)
-	}
-	if args.PageSize > 0 {
-		params.PageSize = intPtr(args.PageSize)
-	}
-	if args.SortBy != "" {
-		params.SortBy = strPtr(normalizeSortBy(args.SortBy))
-	}
-	if args.Filters != "" {
-		params.Filters = strPtr(args.Filters)
-	}
-
-	var list external.WorkPackagesModel
-	var resp *http.Response
-	var err error
-
-	if args.ProjectID > 0 {
-		pParams := &external.GetProjectWorkPackageCollectionParams{}
-		if args.Offset > 0 {
-			pParams.Offset = intPtr(args.Offset)
-		}
-		if args.PageSize > 0 {
-			pParams.PageSize = intPtr(args.PageSize)
-		}
-		if args.SortBy != "" {
-			pParams.SortBy = strPtr(normalizeSortBy(args.SortBy))
-		}
-		if args.Filters != "" {
-			pParams.Filters = strPtr(args.Filters)
-		}
-		resp, err = r.client.APIClient().GetProjectWorkPackageCollection(ctx, args.ProjectID, pParams)
-	defer func() { _ = resp.Body.Close() }()
-	} else {
-		resp, err = r.client.APIClient().ListWorkPackages(ctx, params)
-	}
+	list, err := r.client.ListWorkPackages(ctx, openproject.WorkPackageListInput{
+		ProjectID: args.ProjectID,
+		Offset:    args.Offset,
+		PageSize:  args.PageSize,
+		SortBy:    normalizeSortBy(args.SortBy),
+		Filters:   args.Filters,
+	})
 	if err != nil {
-		return errorResult("Failed to list work packages: %v", err), nil
-	}
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list work packages: %v", err), nil
 	}
 
@@ -210,13 +175,8 @@ func (r *Registry) getWorkPackage(ctx context.Context, req *mcp.CallToolRequest)
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.ID, nil)
-	defer func() { _ = resp.Body.Close() }()
+	wp, err := r.client.GetWorkPackage(ctx, args.ID)
 	if err != nil {
-		return errorResult("Failed to get work package: %v", err), nil
-	}
-	var wp external.WorkPackageModel
-	if err := openproject.ReadResponse(resp, &wp); err != nil {
 		return errorResult("Failed to get work package: %v", err), nil
 	}
 
@@ -258,43 +218,19 @@ func (r *Registry) createWorkPackage(ctx context.Context, req *mcp.CallToolReque
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	body := external.WorkPackageModel{
-		Subject: args.Subject,
-	}
-	if args.Description != "" {
-		fmt := external.FormattableFormat("markdown")
-		body.Description = &external.Formattable{Format: &fmt, Raw: strPtr(args.Description)}
-	}
-	if args.StartDate != "" {
-		body.StartDate = parseDatePtr(args.StartDate)
-	}
-	if args.DueDate != "" {
-		body.DueDate = parseDatePtr(args.DueDate)
-	}
-	if args.EstimatedTime != "" {
-		body.EstimatedTime = strPtr(args.EstimatedTime)
-	}
-	if args.TypeID > 0 {
-		body.UnderscoreLinks.Type = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/types/%d", args.TypeID))}
-	}
-	if args.StatusID > 0 {
-		body.UnderscoreLinks.Status = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/statuses/%d", args.StatusID))}
-	}
-	if args.PriorityID > 0 {
-		body.UnderscoreLinks.Priority = external.Link{Href: strPtr(fmt.Sprintf("/api/v3/priorities/%d", args.PriorityID))}
-	}
-	if args.AssigneeID > 0 {
-		body.UnderscoreLinks.Assignee = &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/users/%d", args.AssigneeID))}
-	}
-
-	params := &external.CreateProjectWorkPackageParams{}
-	resp, err := r.client.APIClient().CreateProjectWorkPackage(ctx, args.ProjectID, params, body)
-	defer func() { _ = resp.Body.Close() }()
+	wp, err := r.client.CreateWorkPackage(ctx, openproject.WorkPackageCreateInput{
+		ProjectID:     args.ProjectID,
+		Subject:       args.Subject,
+		Description:   args.Description,
+		TypeID:        openproject.IntID(args.TypeID),
+		StatusID:      openproject.IntID(args.StatusID),
+		PriorityID:    openproject.IntID(args.PriorityID),
+		AssigneeID:    args.AssigneeID,
+		StartDate:     args.StartDate,
+		DueDate:       args.DueDate,
+		EstimatedTime: args.EstimatedTime,
+	})
 	if err != nil {
-		return errorResult("Failed to create work package: %v", err), nil
-	}
-	var wp external.WorkPackageModel
-	if err := openproject.ReadResponse(resp, &wp); err != nil {
 		return errorResult("Failed to create work package: %v", err), nil
 	}
 	return textResult(fmt.Sprintf("Work package #%d created successfully!\n\nSubject: %s", derefInt(wp.Id), wp.Subject)), nil
@@ -306,72 +242,19 @@ func (r *Registry) updateWorkPackage(ctx context.Context, req *mcp.CallToolReque
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	// First fetch the work package to get LockVersion (required for patch)
-	resp, err := r.client.APIClient().ViewWorkPackage(ctx, args.ID, nil)
-	defer func() { _ = resp.Body.Close() }()
+	wp, err := r.client.UpdateWorkPackage(ctx, openproject.WorkPackageUpdateInput{
+		ID:             args.ID,
+		Subject:        args.Subject,
+		Description:    args.Description,
+		StatusID:       openproject.IntID(args.StatusID),
+		PriorityID:     openproject.IntID(args.PriorityID),
+		AssigneeID:     args.AssigneeID,
+		StartDate:      args.StartDate,
+		DueDate:        args.DueDate,
+		EstimatedTime:  args.EstimatedTime,
+		PercentageDone: args.PercentageDone,
+	})
 	if err != nil {
-		return errorResult("Failed to fetch work package for lock version: %v", err), nil
-	}
-	var current external.WorkPackageModel
-	if err := openproject.ReadResponse(resp, &current); err != nil {
-		return errorResult("Failed to fetch work package for lock version: %v", err), nil
-	}
-
-	lockVersion := 0
-	if current.LockVersion != nil {
-		lockVersion = *current.LockVersion
-	}
-
-	body := external.WorkPackagePatchModel{
-		LockVersion: lockVersion,
-	}
-	if args.Subject != "" {
-		body.Subject = strPtr(args.Subject)
-	}
-	if args.Description != "" {
-		fmt := external.FormattableFormat("markdown")
-		body.Description = &external.Formattable{Format: &fmt, Raw: strPtr(args.Description)}
-	}
-	if args.StartDate != "" {
-		body.StartDate = parseDatePtr(args.StartDate)
-	}
-	if args.DueDate != "" {
-		body.DueDate = parseDatePtr(args.DueDate)
-	}
-	if args.EstimatedTime != "" {
-		body.EstimatedTime = strPtr(args.EstimatedTime)
-	}
-	// Note: PercentageDone is not supported by WorkPackagePatchModel in the generated client.
-
-	body.UnderscoreLinks = &struct {
-		Assignee    *external.Link `json:"assignee,omitempty"`
-		Category    *external.Link `json:"category,omitempty"`
-		Parent      *external.Link `json:"parent,omitempty"`
-		Priority    *external.Link `json:"priority,omitempty"`
-		Project     *external.Link `json:"project,omitempty"`
-		Responsible *external.Link `json:"responsible,omitempty"`
-		Status      *external.Link `json:"status,omitempty"`
-		Type        *external.Link `json:"type,omitempty"`
-		Version     *external.Link `json:"version,omitempty"`
-	}{}
-	if args.StatusID > 0 {
-		body.UnderscoreLinks.Status = &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/statuses/%d", args.StatusID))}
-	}
-	if args.PriorityID > 0 {
-		body.UnderscoreLinks.Priority = &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/priorities/%d", args.PriorityID))}
-	}
-	if args.AssigneeID > 0 {
-		body.UnderscoreLinks.Assignee = &external.Link{Href: strPtr(fmt.Sprintf("/api/v3/users/%d", args.AssigneeID))}
-	}
-
-	resp, err = r.client.APIClient().UpdateWorkPackage(ctx, args.ID, nil, body)
-	defer func() { _ = resp.Body.Close() }()
-	defer func() { _ = resp.Body.Close() }()
-	if err != nil {
-		return errorResult("Failed to update work package: %v", err), nil
-	}
-	var wp external.WorkPackageModel
-	if err := openproject.ReadResponse(resp, &wp); err != nil {
 		return errorResult("Failed to update work package: %v", err), nil
 	}
 	return textResult(fmt.Sprintf("Work package #%d updated successfully!\n\nSubject: %s", derefInt(wp.Id), wp.Subject)), nil
@@ -383,12 +266,7 @@ func (r *Registry) deleteWorkPackage(ctx context.Context, req *mcp.CallToolReque
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().DeleteWorkPackage(ctx, args.ID)
-	defer func() { _ = resp.Body.Close() }()
-	if err != nil {
-		return errorResult("Failed to delete work package: %v", err), nil
-	}
-	if err := openproject.ReadResponse(resp, nil); err != nil {
+	if err := r.client.DeleteWorkPackage(ctx, args.ID); err != nil {
 		return errorResult("Failed to delete work package: %v", err), nil
 	}
 	return textResult(fmt.Sprintf("Work package #%d deleted successfully!", args.ID)), nil
@@ -400,20 +278,8 @@ func (r *Registry) listTypes(ctx context.Context, req *mcp.CallToolRequest) (*mc
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	var resp *http.Response
-	var err error
-	if args.ProjectID > 0 {
-		resp, err = r.client.APIClient().ListTypesAvailableInAProject(ctx, args.ProjectID)
-	defer func() { _ = resp.Body.Close() }()
-	} else {
-		resp, err = r.client.APIClient().ListAllTypes(ctx)
-	}
+	list, err := r.client.ListWorkPackageTypes(ctx, args.ProjectID)
 	if err != nil {
-		return errorResult("Failed to list types: %v", err), nil
-	}
-
-	var list external.TypesByWorkspaceModel
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list types: %v", err), nil
 	}
 
@@ -427,14 +293,8 @@ func (r *Registry) listTypes(ctx context.Context, req *mcp.CallToolRequest) (*mc
 }
 
 func (r *Registry) listStatuses(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	resp, err := r.client.APIClient().ListStatuses(ctx)
-	defer func() { _ = resp.Body.Close() }()
+	list, err := r.client.ListWorkPackageStatuses(ctx)
 	if err != nil {
-		return errorResult("Failed to list statuses: %v", err), nil
-	}
-
-	var list external.StatusCollectionModel
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list statuses: %v", err), nil
 	}
 
@@ -446,14 +306,8 @@ func (r *Registry) listStatuses(ctx context.Context, req *mcp.CallToolRequest) (
 }
 
 func (r *Registry) listPriorities(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	resp, err := r.client.APIClient().ListAllPriorities(ctx)
-	defer func() { _ = resp.Body.Close() }()
+	list, err := r.client.ListWorkPackagePriorities(ctx)
 	if err != nil {
-		return errorResult("Failed to list priorities: %v", err), nil
-	}
-
-	var list external.PriorityCollectionModel
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list priorities: %v", err), nil
 	}
 
@@ -470,14 +324,8 @@ func (r *Registry) listAvailableAssignees(ctx context.Context, req *mcp.CallTool
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().WorkPackageAvailableAssignees(ctx, args.WorkPackageID)
-	defer func() { _ = resp.Body.Close() }()
+	list, err := r.client.ListWorkPackageAvailableAssignees(ctx, args.WorkPackageID)
 	if err != nil {
-		return errorResult("Failed to list available assignees: %v", err), nil
-	}
-
-	var list external.AvailableAssigneesModel
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list available assignees: %v", err), nil
 	}
 

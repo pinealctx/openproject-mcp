@@ -3,11 +3,8 @@ package cmd
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
-	external "github.com/pinealctx/openproject"
-	oapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/spf13/cobra"
 )
 
@@ -132,47 +129,16 @@ Examples:
   # Output as JSON
   openproject-mcp wp list -o json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		api := getClient().APIClient()
-		var result external.WorkPackagesModel
-
-		if wpListProjectID > 0 {
-			params := &external.GetProjectWorkPackageCollectionParams{}
-			if wpListPageSize > 0 {
-				params.PageSize = ptr(wpListPageSize)
-			}
-			if wpListSortBy != "" {
-				params.SortBy = ptr(normalizeSortBy(wpListSortBy))
-			}
-			if wpListFilters != "" {
-				params.Filters = ptr(wpListFilters)
-			}
-			resp, err := api.GetProjectWorkPackageCollection(getContext(), wpListProjectID, params)
-			if err != nil {
-				return err
-			}
-			if err := openproject.ReadResponse(resp, &result); err != nil {
-				return err
-			}
-		} else {
-			params := &external.ListWorkPackagesParams{}
-			if wpListPageSize > 0 {
-				params.PageSize = ptr(wpListPageSize)
-			}
-			if wpListSortBy != "" {
-				params.SortBy = ptr(normalizeSortBy(wpListSortBy))
-			}
-			if wpListFilters != "" {
-				params.Filters = ptr(wpListFilters)
-			}
-			resp, err := api.ListWorkPackages(getContext(), params)
-			if err != nil {
-				return err
-			}
-			if err := openproject.ReadResponse(resp, &result); err != nil {
-				return err
-			}
+		result, err := getClient().ListWorkPackages(getContext(), openproject.WorkPackageListInput{
+			ProjectID: wpListProjectID,
+			PageSize:  wpListPageSize,
+			SortBy:    normalizeSortBy(wpListSortBy),
+			Filters:   wpListFilters,
+		})
+		if err != nil {
+			return err
 		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -185,16 +151,11 @@ var wpGetCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		resp, err := api.ViewWorkPackage(getContext(), id, nil)
+		result, err := getClient().GetWorkPackage(getContext(), id)
 		if err != nil {
 			return err
 		}
-		var result external.WorkPackageModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -202,47 +163,22 @@ var wpCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new work package",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		body := external.WorkPackageModel{
-			Subject: wpCreateSubject,
-		}
-		if wpCreateDescription != "" {
-			f := external.FormattableFormat("markdown")
-			body.Description = &external.Formattable{Format: &f, Raw: ptr(wpCreateDescription)}
-		}
-		if wpCreateStartDate != "" {
-			body.StartDate = parseDate(wpCreateStartDate)
-		}
-		if wpCreateDueDate != "" {
-			body.DueDate = parseDate(wpCreateDueDate)
-		}
-		if wpCreateEstimatedTime != "" {
-			body.EstimatedTime = ptr(wpCreateEstimatedTime)
-		}
-
-		// Set links
-		if wpCreateType != "" {
-			body.UnderscoreLinks.Type = external.Link{Href: ptr("/api/v3/types/" + wpCreateType)}
-		}
-		if wpCreateStatus != "" {
-			body.UnderscoreLinks.Status = external.Link{Href: ptr("/api/v3/statuses/" + wpCreateStatus)}
-		}
-		if wpCreatePriority != "" {
-			body.UnderscoreLinks.Priority = external.Link{Href: ptr("/api/v3/priorities/" + wpCreatePriority)}
-		}
-		if wpCreateAssignee > 0 {
-			body.UnderscoreLinks.Assignee = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/users/%d", wpCreateAssignee))}
-		}
-
-		api := getClient().APIClient()
-		resp, err := api.CreateProjectWorkPackage(getContext(), wpCreateProjectID, nil, body)
+		result, err := getClient().CreateWorkPackage(getContext(), openproject.WorkPackageCreateInput{
+			ProjectID:     wpCreateProjectID,
+			Subject:       wpCreateSubject,
+			Description:   wpCreateDescription,
+			TypeID:        wpCreateType,
+			StatusID:      wpCreateStatus,
+			PriorityID:    wpCreatePriority,
+			AssigneeID:    wpCreateAssignee,
+			StartDate:     wpCreateStartDate,
+			DueDate:       wpCreateDueDate,
+			EstimatedTime: wpCreateEstimatedTime,
+		})
 		if err != nil {
 			return err
 		}
-		var result external.WorkPackageModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -256,57 +192,27 @@ var wpUpdateCmd = &cobra.Command{
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
 
-		// Use raw PATCH since WorkPackagePatchModel doesn't include all fields
-		// (e.g., percentageDone is missing from the patch model)
-		body := map[string]interface{}{}
-		if wpUpdateSubject != "" {
-			body["subject"] = wpUpdateSubject
-		}
-		if wpUpdateDescription != "" {
-			body["description"] = map[string]interface{}{
-				"format": "markdown",
-				"raw":    wpUpdateDescription,
-			}
-		}
-		if wpUpdateStartDate != "" {
-			body["startDate"] = wpUpdateStartDate
-		}
-		if wpUpdateDueDate != "" {
-			body["dueDate"] = wpUpdateDueDate
-		}
-		if wpUpdateEstimatedTime != "" {
-			body["estimatedTime"] = wpUpdateEstimatedTime
-		}
+		var percentageDone *int
 		if cmd.Flags().Changed("progress") {
-			body["percentageDone"] = wpUpdateProgress
+			percentageDone = ptr(wpUpdateProgress)
 		}
 
-		// Set links
-		links := map[string]interface{}{}
-		if wpUpdateStatus != "" {
-			links["status"] = map[string]interface{}{
-				"href": "/api/v3/statuses/" + wpUpdateStatus,
-			}
-		}
-		if wpUpdatePriority != "" {
-			links["priority"] = map[string]interface{}{
-				"href": "/api/v3/priorities/" + wpUpdatePriority,
-			}
-		}
-		if wpUpdateAssignee > 0 {
-			links["assignee"] = map[string]interface{}{
-				"href": fmt.Sprintf("/api/v3/users/%d", wpUpdateAssignee),
-			}
-		}
-		if len(links) > 0 {
-			body["_links"] = links
-		}
-
-		var result external.WorkPackageModel
-		if err := getClient().Patch(getContext(), fmt.Sprintf("/work_packages/%d", id), body, &result); err != nil {
+		result, err := getClient().UpdateWorkPackage(getContext(), openproject.WorkPackageUpdateInput{
+			ID:             id,
+			Subject:        wpUpdateSubject,
+			Description:    wpUpdateDescription,
+			StatusID:       wpUpdateStatus,
+			PriorityID:     wpUpdatePriority,
+			AssigneeID:     wpUpdateAssignee,
+			StartDate:      wpUpdateStartDate,
+			DueDate:        wpUpdateDueDate,
+			EstimatedTime:  wpUpdateEstimatedTime,
+			PercentageDone: percentageDone,
+		})
+		if err != nil {
 			return err
 		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -319,12 +225,7 @@ var wpDeleteCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		resp, err := api.DeleteWorkPackage(getContext(), id)
-		if err != nil {
-			return err
-		}
-		if err := openproject.ReadResponse(resp, nil); err != nil {
+		if err := getClient().DeleteWorkPackage(getContext(), id); err != nil {
 			return err
 		}
 		fmt.Println("Work package deleted successfully")
@@ -341,11 +242,11 @@ var wpChildrenCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
-		var result external.WorkPackagesModel
-		if err := getClient().Get(getContext(), fmt.Sprintf("/work_packages/%d/children", id), &result); err != nil {
+		result, err := getClient().ListWorkPackageChildren(getContext(), id)
+		if err != nil {
 			return err
 		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -360,18 +261,11 @@ var wpSetParentCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
-		body := map[string]interface{}{
-			"_links": map[string]interface{}{
-				"parent": map[string]interface{}{
-					"href": fmt.Sprintf("/api/v3/work_packages/%d", wpParentID),
-				},
-			},
-		}
-		var result external.WorkPackageModel
-		if err := getClient().Patch(getContext(), fmt.Sprintf("/work_packages/%d", id), body, &result); err != nil {
+		result, err := getClient().SetWorkPackageParent(getContext(), id, wpParentID)
+		if err != nil {
 			return err
 		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -384,17 +278,11 @@ var wpRemoveParentCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
-		body := map[string]interface{}{
-			"lockVersion": 0,
-			"_links": map[string]interface{}{
-				"parent": nil,
-			},
-		}
-		var result external.WorkPackageModel
-		if err := getClient().Patch(getContext(), fmt.Sprintf("/work_packages/%d", id), body, &result); err != nil {
+		result, err := getClient().RemoveWorkPackageParent(getContext(), id)
+		if err != nil {
 			return err
 		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -413,19 +301,11 @@ var wpRelationListCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid work package ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		params := &external.ListRelationsParams{
-			Filters: ptr(fmt.Sprintf(`[{"from":{"operator":"=","values":["%d"]}}]`, id)),
-		}
-		resp, err := api.ListRelations(getContext(), params)
+		result, err := getClient().ListRelationsFromWorkPackage(getContext(), id)
 		if err != nil {
 			return err
 		}
-		var result external.RelationCollectionModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -433,28 +313,17 @@ var wpRelationCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a relation between work packages",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		body := external.RelationWriteModel{
-			Type: external.RelationWriteModelType(wpRelationType),
-		}
-		body.UnderscoreLinks.To = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/work_packages/%d", wpRelationToID))}
-		if wpRelationDesc != "" {
-			body.Description = ptr(wpRelationDesc)
-		}
-		if wpRelationDelay > 0 {
-			body.Lag = ptr(wpRelationDelay)
-		}
-
-		// CreateRelation takes the FROM work package ID
-		api := getClient().APIClient()
-		resp, err := api.CreateRelation(getContext(), wpRelationFromID, body)
+		result, err := getClient().CreateRelation(getContext(), openproject.RelationCreateInput{
+			FromID:      wpRelationFromID,
+			ToID:        wpRelationToID,
+			Type:        wpRelationType,
+			Description: wpRelationDesc,
+			Delay:       wpRelationDelay,
+		})
 		if err != nil {
 			return err
 		}
-		var result external.RelationReadModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -467,16 +336,11 @@ var wpRelationGetCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid relation ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		resp, err := api.GetRelation(getContext(), id)
+		result, err := getClient().GetRelation(getContext(), id)
 		if err != nil {
 			return err
 		}
-		var result external.RelationReadModel
-		if err := openproject.ReadResponse(resp, &result); err != nil {
-			return err
-		}
-		return output(&result)
+		return output(result)
 	},
 }
 
@@ -489,31 +353,12 @@ var wpRelationDeleteCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("invalid relation ID: %s", args[0])
 		}
-		api := getClient().APIClient()
-		resp, err := api.DeleteRelation(getContext(), id)
-		if err != nil {
-			return err
-		}
-		if err := openproject.ReadResponse(resp, nil); err != nil {
+		if err := getClient().DeleteRelation(getContext(), id); err != nil {
 			return err
 		}
 		fmt.Println("Relation deleted successfully")
 		return nil
 	},
-}
-
-// parseDate parses a "YYYY-MM-DD" string into an openapi_types.Date pointer.
-// Returns nil if the string is empty.
-func parseDate(s string) *oapi_types.Date {
-	if s == "" {
-		return nil
-	}
-	t, err := time.Parse("2006-01-02", s)
-	if err != nil {
-		return nil
-	}
-	d := oapi_types.Date{Time: t}
-	return &d
 }
 
 func init() {
