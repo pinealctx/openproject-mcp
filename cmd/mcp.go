@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	mcpTransport   string
-	mcpPort        int
-	mcpToolMode    string
+	mcpTransport    string
+	mcpPort         int
+	mcpToolMode     string
 	mcpEnabledTools string
 )
 
@@ -26,7 +26,7 @@ var mcpCmd = &cobra.Command{
 	Short: "Start MCP server",
 	Long: `Start the MCP (Model Context Protocol) server for AI assistants.
 
-The MCP server exposes 48+ tools for AI assistants (like Claude) to interact
+The MCP server exposes 60+ tools for AI assistants (like Claude) to interact
 with OpenProject. This enables AI-powered project management workflows.
 
 TRANSPORT MODES:

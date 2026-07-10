@@ -29,6 +29,9 @@ var toolGroups = map[string]ToolGroup{
 	"user":    {IsDefault: true, Tools: []string{"list_users", "get_user"}},
 	"version": {IsDefault: true, Tools: []string{"list_versions", "create_version", "update_version", "delete_version"}},
 	"search":  {IsDefault: true, Tools: []string{"search"}},
+	"comment": {IsDefault: true, Tools: []string{
+		"list_work_package_activities", "create_work_package_comment",
+	}},
 	// Full-only mode groups
 	"membership": {IsDefault: false, Tools: []string{
 		"list_memberships", "get_membership", "create_membership",
@@ -44,9 +47,6 @@ var toolGroups = map[string]ToolGroup{
 	}},
 	"notification": {IsDefault: false, Tools: []string{
 		"list_notifications", "mark_notification_read", "mark_all_notifications_read",
-	}},
-	"comment": {IsDefault: false, Tools: []string{
-		"list_work_package_activities", "create_work_package_comment",
 	}},
 	"watcher": {IsDefault: false, Tools: []string{
 		"list_work_package_watchers", "add_work_package_watcher", "remove_work_package_watcher",

@@ -3,10 +3,8 @@ package tools
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	external "github.com/pinealctx/openproject"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
@@ -18,30 +16,6 @@ type CreateWorkPackageCommentArgs struct {
 	WorkPackageID int    `json:"workPackageId"`
 	Raw           string `json:"raw"`
 	Internal      bool   `json:"internal,omitempty"`
-}
-
-// activityCollection is a minimal HAL collection for work package activities.
-type activityCollection struct {
-	Embedded struct {
-		Elements []activityElement `json:"elements"`
-	} `json:"_embedded"`
-	Count int `json:"count"`
-	Total int `json:"total"`
-}
-
-// activityElement represents a single activity/comment in a collection.
-type activityElement struct {
-	ID        *int                  `json:"id,omitempty"`
-	Type      *string               `json:"_type,omitempty"`
-	Comment   *external.Formattable `json:"comment,omitempty"`
-	Details   []any                 `json:"details,omitempty"`
-	CreatedAt *time.Time            `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time            `json:"updatedAt,omitempty"`
-	Internal  *bool                 `json:"internal,omitempty"`
-	Links     *struct {
-		Self *external.Link `json:"self,omitempty"`
-		User *external.Link `json:"user,omitempty"`
-	} `json:"_links,omitempty"`
 }
 
 func (r *Registry) registerCommentTools(server *mcp.Server) {
@@ -68,12 +42,8 @@ func (r *Registry) listWorkPackageActivities(ctx context.Context, req *mcp.CallT
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	resp, err := r.client.APIClient().ListWorkPackageActivities(ctx, args.WorkPackageID)
+	list, err := r.client.ListWorkPackageActivities(ctx, args.WorkPackageID)
 	if err != nil {
-		return errorResult("Failed to list activities: %v", err), nil
-	}
-	var list activityCollection
-	if err := openproject.ReadResponse(resp, &list); err != nil {
 		return errorResult("Failed to list activities: %v", err), nil
 	}
 
@@ -111,24 +81,12 @@ func (r *Registry) createWorkPackageComment(ctx context.Context, req *mcp.CallTo
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	body := external.ActivityCommentWriteModel{
-		Comment: &struct {
-			Raw *string `json:"raw,omitempty"`
-		}{
-			Raw: strPtr(args.Raw),
-		},
-	}
-	if args.Internal {
-		internal := true
-		body.Internal = &internal
-	}
-
-	resp, err := r.client.APIClient().CommentWorkPackage(ctx, args.WorkPackageID, nil, body)
+	activity, err := r.client.CreateWorkPackageComment(ctx, openproject.WorkPackageCommentInput{
+		WorkPackageID: args.WorkPackageID,
+		Raw:           args.Raw,
+		Internal:      args.Internal,
+	})
 	if err != nil {
-		return errorResult("Failed to create comment: %v", err), nil
-	}
-	var activity external.ActivityModel
-	if err := openproject.ReadResponse(resp, &activity); err != nil {
 		return errorResult("Failed to create comment: %v", err), nil
 	}
 

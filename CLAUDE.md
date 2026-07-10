@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-An MCP (Model Context Protocol) server in Go that exposes 80+ tools for interacting with the OpenProject API v3. Built with the official [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) and the generated [OpenProject API client](https://github.com/pinealctx/openproject) (`github.com/pinealctx/openproject`).
+An MCP (Model Context Protocol) server in Go that exposes 60+ tools for interacting with the OpenProject API v3. Built with the official [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) and the generated [OpenProject API client](https://github.com/pinealctx/openproject) (`github.com/pinealctx/openproject`).
 
 Also provides a CLI for direct OpenProject operations.
 
@@ -71,12 +71,12 @@ Three modes control which MCP tools are registered:
 
 | Mode | Tool Count | Config |
 |------|-----------|--------|
-| `default` | ~22 core tools | `TOOL_MODE=default` |
-| `full` | ~80+ all tools | `TOOL_MODE=full` |
+| `default` | ~24 core tools | `TOOL_MODE=default` |
+| `full` | ~60+ all tools | `TOOL_MODE=full` |
 | `custom` | user-selected | `TOOL_MODE=custom ENABLED_TOOLS=list_projects,get_project` |
 
-Default groups: connection, project, work_package, user, version, search
-Full-only groups: membership, relation, notification, comment, watcher, group, document, query, placeholder, configuration
+Default groups: connection, project, work_package, user, version, search, comment
+Full-only groups: membership, relation, notification, watcher, group, document, query, placeholder, configuration
 
 ## Transports
 

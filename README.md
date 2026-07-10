@@ -1,6 +1,6 @@
 # openproject-mcp
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for [OpenProject](https://www.openproject.org/), written in Go. Exposes **48 tools** covering projects, work packages, users, memberships, time entries, versions, relations, boards, search, and notifications — enabling AI assistants such as Claude and GitHub Copilot to manage OpenProject directly.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for [OpenProject](https://www.openproject.org/), written in Go. Exposes **60+ tools** covering projects, work packages, users, memberships, versions, relations, search, comments, watchers, and notifications — enabling AI assistants such as Claude and GitHub Copilot to manage OpenProject directly.
 
 Built with the official [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk).
 
@@ -75,6 +75,9 @@ openproject-mcp wp list -p 42
 # Create a work package
 openproject-mcp wp create -p 42 -s "Implement feature X"
 
+# Add a comment to a work package
+openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
+
 # Search across OpenProject
 openproject-mcp search "bug"
 
@@ -117,6 +120,8 @@ openproject-mcp wp get 123
 openproject-mcp wp create -p 42 -s "Fix login bug" -d "Description here"
 openproject-mcp wp update 123 --status "In Progress" --progress 50
 openproject-mcp wp update 123 --assignee 5
+openproject-mcp wp activities 123
+openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
 openproject-mcp wp delete 123
 
 # === Work Package Relations ===
@@ -301,7 +306,7 @@ Add to your Zed settings:
 }
 ```
 
-## Tools (48)
+## Tools (60+)
 
 ### Connection & Auth
 | Tool | Description |
@@ -329,8 +334,8 @@ Add to your Zed settings:
 | `create_work_package` | Create a work package |
 | `update_work_package` | Update a work package (auto-fetches lockVersion) |
 | `delete_work_package` | Delete a work package |
-| `move_work_package` | Move a work package to another project |
-| `watch_work_package` | Watch a work package for notifications |
+| `list_work_package_activities` | List activities and comments for a work package |
+| `create_work_package_comment` | Add a comment to a work package |
 | `list_types` | List available work package types |
 | `list_statuses` | List available work package statuses |
 | `list_priorities` | List available work package priorities |

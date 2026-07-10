@@ -9,6 +9,7 @@ import (
 	"text/tabwriter"
 
 	external "github.com/pinealctx/openproject"
+	projectapi "github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
 var outputWriter io.Writer = os.Stdout
@@ -56,6 +57,10 @@ func outputText(data interface{}) error {
 		return outputRelationList(v)
 	case *external.RelationReadModel:
 		return outputRelation(v)
+	case *projectapi.ActivityCollection:
+		return outputActivityList(v)
+	case *external.ActivityModel:
+		return outputActivity(v)
 	case *external.StatusCollectionModel:
 		return outputStatusList(v)
 	case *external.StatusModel:
@@ -351,6 +356,35 @@ func outputRelation(r *external.RelationReadModel) error {
 	if r.Lag != nil && *r.Lag > 0 {
 		_, _ = fmt.Fprintf(outputWriter, "Delay: %d days\n", *r.Lag)
 	}
+	return nil
+}
+
+// --- Activity output ---
+
+func outputActivityList(list *projectapi.ActivityCollection) error {
+	w := newTabWriter()
+	_, _ = fmt.Fprintln(w, "ID\tTYPE\tUSER\tINTERNAL\tCREATED\tCOMMENT")
+	for _, activity := range list.Embedded.Elements {
+		user := "-"
+		if activity.Links != nil && activity.Links.User != nil {
+			user = dStr(activity.Links.User.Title)
+		}
+		created := "-"
+		if activity.CreatedAt != nil {
+			created = activity.CreatedAt.Format("2006-01-02 15:04")
+		}
+		comment := "-"
+		if activity.Comment != nil && activity.Comment.Raw != nil && *activity.Comment.Raw != "" {
+			comment = truncate(*activity.Comment.Raw, 60)
+		}
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%t\t%s\t%s\n",
+			dInt(activity.ID), dStr(activity.Type), user, dBool(activity.Internal), created, comment)
+	}
+	return w.Flush()
+}
+
+func outputActivity(activity *external.ActivityModel) error {
+	_, _ = fmt.Fprintf(outputWriter, "Activity ID: %d\n", dInt(activity.Id))
 	return nil
 }
 

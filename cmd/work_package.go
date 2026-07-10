@@ -40,6 +40,9 @@ var (
 	wpRelationType   string
 	wpRelationDesc   string
 	wpRelationDelay  int
+
+	wpCommentMessage  string
+	wpCommentInternal bool
 )
 
 // workPackageCmd represents the work-package command.
@@ -65,6 +68,8 @@ Available subcommands:
   update        Update work package properties
   delete        Delete a work package
   children      List child work packages
+  activities    List activity/comment history
+  comment       Add a comment
   set-parent    Set parent work package (for hierarchy)
   remove-parent Remove parent relationship
   relation      Manage relations between work packages
@@ -93,6 +98,9 @@ Examples:
 
   # Assign work package
   openproject-mcp wp update 123 --assignee 5
+
+  # Add a comment
+  openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
 
   # Set parent for hierarchy
   openproject-mcp wp set-parent 123 -p 100
@@ -250,6 +258,51 @@ var wpChildrenCmd = &cobra.Command{
 	},
 }
 
+var wpActivitiesCmd = &cobra.Command{
+	Use:     "activities <id>",
+	Aliases: []string{"activity", "comments"},
+	Short:   "List activities and comments for a work package",
+	Args:    cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("invalid work package ID: %s", args[0])
+		}
+		result, err := getClient().ListWorkPackageActivities(getContext(), id)
+		if err != nil {
+			return err
+		}
+		return output(result)
+	},
+}
+
+var wpCommentCmd = &cobra.Command{
+	Use:     "comment <id>",
+	Aliases: []string{"add-comment"},
+	Short:   "Add a comment to a work package",
+	Long: `Add a markdown comment to a work package.
+
+Examples:
+  openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
+  openproject-mcp wp comment 123 -m "Internal note" --internal`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("invalid work package ID: %s", args[0])
+		}
+		result, err := getClient().CreateWorkPackageComment(getContext(), openproject.WorkPackageCommentInput{
+			WorkPackageID: id,
+			Raw:           wpCommentMessage,
+			Internal:      wpCommentInternal,
+		})
+		if err != nil {
+			return err
+		}
+		return output(result)
+	},
+}
+
 var wpParentID int
 
 var wpSetParentCmd = &cobra.Command{
@@ -369,6 +422,8 @@ func init() {
 	workPackageCmd.AddCommand(wpUpdateCmd)
 	workPackageCmd.AddCommand(wpDeleteCmd)
 	workPackageCmd.AddCommand(wpChildrenCmd)
+	workPackageCmd.AddCommand(wpActivitiesCmd)
+	workPackageCmd.AddCommand(wpCommentCmd)
 	workPackageCmd.AddCommand(wpSetParentCmd)
 	workPackageCmd.AddCommand(wpRemoveParentCmd)
 	workPackageCmd.AddCommand(wpRelationCmd)
@@ -408,6 +463,11 @@ func init() {
 	wpUpdateCmd.Flags().StringVar(&wpUpdateDueDate, "due", "", "Due date (YYYY-MM-DD)")
 	wpUpdateCmd.Flags().StringVar(&wpUpdateEstimatedTime, "estimate", "", "Estimated time (e.g., PT4H)")
 	wpUpdateCmd.Flags().IntVarP(&wpUpdateProgress, "progress", "r", 0, "Percentage done (0-100)")
+
+	// Comment flags
+	wpCommentCmd.Flags().StringVarP(&wpCommentMessage, "message", "m", "", "Comment text in markdown (required)")
+	wpCommentCmd.Flags().BoolVar(&wpCommentInternal, "internal", false, "Mark the comment as internal")
+	_ = wpCommentCmd.MarkFlagRequired("message")
 
 	// Set parent flags
 	wpSetParentCmd.Flags().IntVarP(&wpParentID, "parent", "p", 0, "Parent work package ID (required)")

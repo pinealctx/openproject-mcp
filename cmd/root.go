@@ -45,7 +45,7 @@ This tool can be used in two modes:
    - Scriptable for automation and CI/CD integration
 
 2. MCP Server Mode: Model Context Protocol server for AI assistants
-   - Exposes 48+ tools for AI assistants like Claude
+   - Exposes 60+ tools for AI assistants like Claude
    - Supports stdio, SSE, and HTTP transports
    - Enables AI-powered project management workflows
 
