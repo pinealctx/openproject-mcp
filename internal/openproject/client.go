@@ -283,5 +283,25 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	return e.Message
+	status := http.StatusText(e.StatusCode)
+	message := fmt.Sprintf("OpenProject API request failed with HTTP %d", e.StatusCode)
+	if status != "" {
+		message += " " + status
+	}
+	if isSafeErrorIdentifier(e.ErrorID) {
+		message += fmt.Sprintf(" (error identifier: %s)", e.ErrorID)
+	}
+	return message
+}
+
+func isSafeErrorIdentifier(identifier string) bool {
+	if identifier == "" || len(identifier) > 256 {
+		return false
+	}
+	for _, char := range identifier {
+		if char < 0x21 || char > 0x7e {
+			return false
+		}
+	}
+	return true
 }
