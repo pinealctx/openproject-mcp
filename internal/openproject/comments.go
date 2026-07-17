@@ -41,6 +41,9 @@ type Activity struct {
 func (c *Client) ListWorkPackageActivities(ctx context.Context, workPackageID int) (*ActivityCollection, error) {
 	var list ActivityCollection
 	resp, err := c.apiClient.ListWorkPackageActivities(ctx, workPackageID)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &list, DecodeResponse(resp, err, &list)
 }
 
@@ -59,5 +62,8 @@ func (c *Client) CreateWorkPackageComment(ctx context.Context, input WorkPackage
 
 	var activity external.ActivityModel
 	resp, err := c.apiClient.CommentWorkPackage(ctx, input.WorkPackageID, nil, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &activity, DecodeResponse(resp, err, &activity)
 }

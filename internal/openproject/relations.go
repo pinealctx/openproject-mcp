@@ -38,6 +38,9 @@ func (c *Client) ListRelations(ctx context.Context, input RelationListInput) (*e
 
 	var relations external.RelationCollectionModel
 	resp, err := c.apiClient.ListRelations(ctx, params)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &relations, DecodeResponse(resp, err, &relations)
 }
 
@@ -56,6 +59,9 @@ func (c *Client) ListRelationsInvolvingWorkPackage(ctx context.Context, workPack
 func (c *Client) GetRelation(ctx context.Context, id int) (*external.RelationReadModel, error) {
 	var relation external.RelationReadModel
 	resp, err := c.apiClient.GetRelation(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &relation, DecodeResponse(resp, err, &relation)
 }
 
@@ -73,6 +79,9 @@ func (c *Client) CreateRelation(ctx context.Context, input RelationCreateInput) 
 
 	var relation external.RelationReadModel
 	resp, err := c.apiClient.CreateRelation(ctx, input.FromID, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &relation, DecodeResponse(resp, err, &relation)
 }
 
@@ -97,5 +106,8 @@ func (c *Client) UpdateRelation(ctx context.Context, input RelationUpdateInput) 
 
 func (c *Client) DeleteRelation(ctx context.Context, id int) error {
 	resp, err := c.apiClient.DeleteRelation(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return DecodeResponse(resp, err, nil)
 }

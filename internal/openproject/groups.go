@@ -27,12 +27,18 @@ func (c *Client) ListGroups(ctx context.Context, input GroupListInput) (*externa
 
 	var groups external.GroupCollectionModel
 	resp, err := c.apiClient.ListGroups(ctx, params)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &groups, DecodeResponse(resp, err, &groups)
 }
 
 func (c *Client) GetGroup(ctx context.Context, id int) (*external.GroupModel, error) {
 	var group external.GroupModel
 	resp, err := c.apiClient.GetGroup(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &group, DecodeResponse(resp, err, &group)
 }
 
@@ -44,6 +50,9 @@ func (c *Client) CreateGroup(ctx context.Context, input GroupCreateInput) (*exte
 
 	var group external.GroupModel
 	resp, err := c.apiClient.CreateGroup(ctx, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &group, DecodeResponse(resp, err, &group)
 }
 
@@ -55,10 +64,16 @@ func (c *Client) UpdateGroup(ctx context.Context, input GroupUpdateInput) (*exte
 
 	var group external.GroupModel
 	resp, err := c.apiClient.UpdateGroup(ctx, input.ID, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &group, DecodeResponse(resp, err, &group)
 }
 
 func (c *Client) DeleteGroup(ctx context.Context, id int) error {
 	resp, err := c.apiClient.DeleteGroup(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return DecodeResponse(resp, err, nil)
 }

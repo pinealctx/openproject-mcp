@@ -40,12 +40,18 @@ func (c *Client) ListDocuments(ctx context.Context, input DocumentListInput) (*D
 
 	var documents DocumentCollection
 	resp, err := c.apiClient.ListDocuments(ctx, params)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &documents, DecodeResponse(resp, err, &documents)
 }
 
 func (c *Client) GetDocument(ctx context.Context, id int) (*external.DocumentModel, error) {
 	var document external.DocumentModel
 	resp, err := c.apiClient.ViewDocument(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &document, DecodeResponse(resp, err, &document)
 }
 
@@ -64,5 +70,8 @@ func (c *Client) UpdateDocument(ctx context.Context, input DocumentUpdateInput) 
 
 	var document external.DocumentModel
 	resp, err := c.apiClient.UpdateDocument(ctx, input.ID, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &document, DecodeResponse(resp, err, &document)
 }

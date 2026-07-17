@@ -185,6 +185,9 @@ func (c *Client) TestConnection(ctx context.Context) (*external.UserModel, error
 		Filters:  ptr(`[{"status":{"operator":"!","values":["*"]}}]`),
 		PageSize: ptr(1),
 	})
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err := DecodeResponse(resp, err, nil); err != nil {
 		return nil, err
 	}
@@ -203,6 +206,9 @@ func (c *Client) GetCurrentUser(ctx context.Context) (*external.UserModel, error
 // GetAPIRoot retrieves the API root document.
 func (c *Client) GetAPIRoot(ctx context.Context) (*external.RootModel, error) {
 	resp, err := c.apiClient.ViewRoot(ctx)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -236,6 +242,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	return ReadResponse(resp, result)
 }
 

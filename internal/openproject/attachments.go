@@ -119,6 +119,9 @@ type attachmentResource struct {
 func (c *Client) ListWorkPackageAttachments(ctx context.Context, workPackageID int) (*AttachmentCollection, error) {
 	var model external.AttachmentsModel
 	resp, err := c.apiClient.ListWorkPackageAttachments(ctx, workPackageID)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err := DecodeResponse(resp, err, &model); err != nil {
 		return nil, err
 	}
@@ -291,6 +294,9 @@ func (c *Client) DeleteAttachment(ctx context.Context, attachmentID int) (*Attac
 		return nil, err
 	}
 	resp, err := c.apiClient.DeleteAttachment(ctx, attachmentID)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err := DecodeResponse(resp, err, nil); err != nil {
 		return nil, err
 	}
@@ -300,6 +306,9 @@ func (c *Client) DeleteAttachment(ctx context.Context, attachmentID int) (*Attac
 func (c *Client) listWorkPackageAttachmentResources(ctx context.Context, workPackageID int) ([]attachmentResource, error) {
 	var model external.AttachmentsModel
 	resp, err := c.apiClient.ListWorkPackageAttachments(ctx, workPackageID)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err := DecodeResponse(resp, err, &model); err != nil {
 		return nil, err
 	}
@@ -323,6 +332,9 @@ func (c *Client) listWorkPackageAttachmentResources(ctx context.Context, workPac
 func (c *Client) getAttachmentResource(ctx context.Context, attachmentID int) (attachmentResource, error) {
 	var model external.AttachmentModel
 	resp, err := c.apiClient.ViewAttachment(ctx, attachmentID)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err := DecodeResponse(resp, err, &model); err != nil {
 		return attachmentResource{}, err
 	}

@@ -55,18 +55,27 @@ func (c *Client) ListWorkPackages(ctx context.Context, input WorkPackageListInpu
 		params := &external.GetProjectWorkPackageCollectionParams{}
 		applyWorkPackageListParams(&params.Offset, &params.PageSize, &params.SortBy, &params.Filters, input)
 		resp, err := c.apiClient.GetProjectWorkPackageCollection(ctx, input.ProjectID, params)
+		if resp != nil {
+			defer func() { _ = resp.Body.Close() }()
+		}
 		return &list, DecodeResponse(resp, err, &list)
 	}
 
 	params := &external.ListWorkPackagesParams{}
 	applyWorkPackageListParams(&params.Offset, &params.PageSize, &params.SortBy, &params.Filters, input)
 	resp, err := c.apiClient.ListWorkPackages(ctx, params)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &list, DecodeResponse(resp, err, &list)
 }
 
 func (c *Client) GetWorkPackage(ctx context.Context, id int) (*external.WorkPackageModel, error) {
 	var wp external.WorkPackageModel
 	resp, err := c.apiClient.ViewWorkPackage(ctx, id, nil)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &wp, DecodeResponse(resp, err, &wp)
 }
 
@@ -102,6 +111,9 @@ func (c *Client) CreateWorkPackage(ctx context.Context, input WorkPackageCreateI
 
 	var wp external.WorkPackageModel
 	resp, err := c.apiClient.CreateProjectWorkPackage(ctx, input.ProjectID, nil, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &wp, DecodeResponse(resp, err, &wp)
 }
 
@@ -145,6 +157,9 @@ func (c *Client) ListWorkPackageChildren(ctx context.Context, workPackageID int)
 
 func (c *Client) DeleteWorkPackage(ctx context.Context, id int) error {
 	resp, err := c.apiClient.DeleteWorkPackage(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return DecodeResponse(resp, err, nil)
 }
 
@@ -152,27 +167,42 @@ func (c *Client) ListWorkPackageTypes(ctx context.Context, projectID int) (*exte
 	var list external.TypesByWorkspaceModel
 	if projectID > 0 {
 		httpResp, err := c.apiClient.ListTypesAvailableInAProject(ctx, projectID)
+		if httpResp != nil {
+			defer func() { _ = httpResp.Body.Close() }()
+		}
 		return &list, DecodeResponse(httpResp, err, &list)
 	}
 	httpResp, err := c.apiClient.ListAllTypes(ctx)
+	if httpResp != nil {
+		defer func() { _ = httpResp.Body.Close() }()
+	}
 	return &list, DecodeResponse(httpResp, err, &list)
 }
 
 func (c *Client) ListWorkPackageStatuses(ctx context.Context) (*external.StatusCollectionModel, error) {
 	var list external.StatusCollectionModel
 	resp, err := c.apiClient.ListStatuses(ctx)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &list, DecodeResponse(resp, err, &list)
 }
 
 func (c *Client) ListWorkPackagePriorities(ctx context.Context) (*external.PriorityCollectionModel, error) {
 	var list external.PriorityCollectionModel
 	resp, err := c.apiClient.ListAllPriorities(ctx)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &list, DecodeResponse(resp, err, &list)
 }
 
 func (c *Client) ListWorkPackageAvailableAssignees(ctx context.Context, workPackageID int) (*external.AvailableAssigneesModel, error) {
 	var list external.AvailableAssigneesModel
 	resp, err := c.apiClient.WorkPackageAvailableAssignees(ctx, workPackageID)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &list, DecodeResponse(resp, err, &list)
 }
 

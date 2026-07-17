@@ -175,8 +175,7 @@ func TestDownloadAttachmentDoesNotLeakAuthCrossOriginOrRedirect(t *testing.T) {
 	}))
 	defer externalServer.Close()
 
-	var metadataServer *httptest.Server
-	metadataServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	metadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/v3/attachments/7":
 			writeJSON(t, w, attachmentFixture(7, 42, "external.txt", content, "/api/v3/attachments/7/content"))
@@ -401,6 +400,7 @@ func attachmentFixture(id, workPackageID int, fileName string, content []byte, d
 
 func assertFileContents(t *testing.T, filePath string, expected []byte) {
 	t.Helper()
+	// #nosec G304 -- callers pass paths created inside test-owned temporary directories.
 	actual, err := os.ReadFile(filePath)
 	if err != nil {
 		t.Fatalf("read downloaded file: %v", err)

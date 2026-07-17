@@ -37,12 +37,18 @@ func (c *Client) ListProjects(ctx context.Context, input ProjectListInput) (*ext
 
 	var projects external.ProjectCollectionModel
 	resp, err := c.apiClient.ListProjects(ctx, params)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &projects, DecodeResponse(resp, err, &projects)
 }
 
 func (c *Client) GetProject(ctx context.Context, id int) (*external.ProjectModel, error) {
 	var project external.ProjectModel
 	resp, err := c.apiClient.ViewProject(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &project, DecodeResponse(resp, err, &project)
 }
 
@@ -59,6 +65,9 @@ func (c *Client) CreateProject(ctx context.Context, input ProjectCreateInput) (*
 
 	var project external.ProjectModel
 	resp, err := c.apiClient.CreateProject(ctx, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &project, DecodeResponse(resp, err, &project)
 }
 
@@ -77,10 +86,16 @@ func (c *Client) UpdateProject(ctx context.Context, input ProjectUpdateInput) (*
 
 	var project external.ProjectModel
 	resp, err := c.apiClient.UpdateProject(ctx, input.ID, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &project, DecodeResponse(resp, err, &project)
 }
 
 func (c *Client) DeleteProject(ctx context.Context, id int) error {
 	resp, err := c.apiClient.DeleteProject(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return DecodeResponse(resp, err, nil)
 }

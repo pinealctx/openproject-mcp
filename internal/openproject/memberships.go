@@ -38,12 +38,18 @@ func (c *Client) ListMemberships(ctx context.Context, input MembershipListInput)
 
 	var memberships external.MembershipCollectionModel
 	resp, err := c.apiClient.ListMemberships(ctx, params)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &memberships, DecodeResponse(resp, err, &memberships)
 }
 
 func (c *Client) GetMembership(ctx context.Context, id int) (*external.MembershipReadModel, error) {
 	var membership external.MembershipReadModel
 	resp, err := c.apiClient.GetMembership(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &membership, DecodeResponse(resp, err, &membership)
 }
 
@@ -52,6 +58,9 @@ func (c *Client) CreateMembership(ctx context.Context, input MembershipCreateInp
 
 	var membership external.MembershipReadModel
 	resp, err := c.apiClient.CreateMembership(ctx, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &membership, DecodeResponse(resp, err, &membership)
 }
 
@@ -60,16 +69,25 @@ func (c *Client) UpdateMembership(ctx context.Context, input MembershipUpdateInp
 
 	var membership external.MembershipReadModel
 	resp, err := c.apiClient.UpdateMembership(ctx, input.ID, body)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &membership, DecodeResponse(resp, err, &membership)
 }
 
 func (c *Client) DeleteMembership(ctx context.Context, id int) error {
 	resp, err := c.apiClient.DeleteMembership(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return DecodeResponse(resp, err, nil)
 }
 
 func (c *Client) ListRolesRaw(ctx context.Context) (map[string]any, error) {
 	resp, err := c.apiClient.ListRoles(ctx, nil)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +101,9 @@ func (c *Client) ListRolesRaw(ctx context.Context) (map[string]any, error) {
 func (c *Client) GetRole(ctx context.Context, id int) (*external.RoleModel, error) {
 	var role external.RoleModel
 	resp, err := c.apiClient.ViewRole(ctx, id)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	return &role, DecodeResponse(resp, err, &role)
 }
 
