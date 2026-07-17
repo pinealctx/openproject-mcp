@@ -1,20 +1,20 @@
 # openproject-mcp
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for [OpenProject](https://www.openproject.org/), written in Go. Exposes **60+ tools** covering projects, work packages, users, memberships, versions, relations, search, comments, watchers, and notifications — enabling AI assistants such as Claude and GitHub Copilot to manage OpenProject directly.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server and command-line client for [OpenProject](https://www.openproject.org/), written in Go. It covers projects, work packages, comments, attachments, users, memberships, versions, relations, search, watchers, and notifications.
 
 Built with the official [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk).
 
 ## Installation
 
-**Via `go install` (recommended):**
+**Download a pre-built binary (recommended):**
+
+Grab the latest release for your platform from [GitHub Releases](https://github.com/pinealctx/openproject-mcp/releases).
+
+**Via `go install` (developer fallback):**
 
 ```bash
 go install github.com/pinealctx/openproject-mcp@latest
 ```
-
-**Download a pre-built binary:**
-
-Grab the latest release for your platform from [GitHub Releases](https://github.com/pinealctx/openproject-mcp/releases).
 
 **Build from source:**
 
@@ -78,6 +78,10 @@ openproject-mcp wp create -p 42 -s "Implement feature X"
 # Add a comment to a work package
 openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
 
+# List and download work package attachments
+openproject-mcp attachment list 123
+openproject-mcp attachment download-all 123
+
 # Search across OpenProject
 openproject-mcp search "bug"
 
@@ -91,10 +95,9 @@ openproject-mcp project list -o json
 |---------|-------|-------------|
 | `project` | `proj`, `p` | Manage projects |
 | `work-package` | `wp` | Manage work packages (tasks, bugs, features) |
+| `attachment` | `attachments` | Manage work package attachments |
 | `user` | `u` | Manage users |
 | `membership` | `member`, `m` | Manage project memberships |
-| `time-entry` | `time`, `te` | Manage time entries (work logs) |
-| `board` | - | Manage Kanban boards |
 | `notification` | `notify` | Manage notifications |
 | `search` | - | Search across projects, work packages, users |
 | `status` | - | List work package statuses |
@@ -124,6 +127,14 @@ openproject-mcp wp activities 123
 openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
 openproject-mcp wp delete 123
 
+# === Attachments ===
+openproject-mcp attachment list 123 -o json
+openproject-mcp attachment get 456 -o json
+openproject-mcp attachment upload 123 ./report.pdf --description "Release report"
+openproject-mcp attachment download 456 --destination ./report.pdf
+openproject-mcp attachment download-all 123 --directory ./ticket-123-files
+openproject-mcp attachment delete 456 --yes
+
 # === Work Package Relations ===
 openproject-mcp wp set-parent 123 -p 100
 openproject-mcp wp relation create --from 123 --to 456 --type blocks
@@ -132,11 +143,6 @@ openproject-mcp wp relation create --from 123 --to 456 --type blocks
 openproject-mcp user list
 openproject-mcp user get 5
 openproject-mcp user me
-
-# === Time Entries ===
-openproject-mcp time-entry list -p 42
-openproject-mcp time-entry create -H 4 -c "Worked on feature X"
-openproject-mcp time-entry create -H 8 -w 123 -d 2024-01-15
 
 # === Memberships ===
 openproject-mcp membership list -p 42
@@ -231,6 +237,7 @@ If neither server-level nor per-request credentials are available, the server re
 | `OPENPROJECT_URL` | Yes | OpenProject instance URL |
 | `OPENPROJECT_API_KEY` | Yes | API key for authentication |
 | `OPENPROJECT_PROXY` | No | HTTP/HTTPS/SOCKS5 proxy URL |
+| `OPENPROJECT_TRANSFER_TIMEOUT` | No | Upload/download timeout as a Go duration (default: `5m`) |
 | `LOG_LEVEL` | No | `debug`, `info`, `warn`, `error` (default: `info`) |
 | `TRANSPORT` | No | `stdio`, `sse`, `http` (default: `stdio`) |
 | `PORT` | No | Port for SSE/HTTP transport (default: `8080`) |
@@ -336,6 +343,8 @@ Add to your Zed settings:
 | `delete_work_package` | Delete a work package |
 | `list_work_package_activities` | List activities and comments for a work package |
 | `create_work_package_comment` | Add a comment to a work package |
+| `list_work_package_attachments` | List file attachment metadata for a work package |
+| `get_attachment` | Get attachment metadata without downloading file content |
 | `list_types` | List available work package types |
 | `list_statuses` | List available work package statuses |
 | `list_priorities` | List available work package priorities |
@@ -368,31 +377,11 @@ Add to your Zed settings:
 | `delete_membership` | Remove a user from a project |
 | `list_project_members` | List members of a specific project |
 
-### Time Tracking
-| Tool | Description |
-|------|-------------|
-| `list_time_entries` | List time entries with optional filters |
-| `create_time_entry` | Log time on a work package |
-| `update_time_entry` | Update a time entry |
-| `delete_time_entry` | Delete a time entry |
-| `list_time_entry_activities` | List available activity types |
-
 ### Versions
 | Tool | Description |
 |------|-------------|
 | `list_versions` | List versions in a project |
 | `create_version` | Create a new version |
-
-### Boards (Kanban)
-| Tool | Description |
-|------|-------------|
-| `get_boards` | List boards, optionally filtered by project |
-| `get_board` | Get a board by ID |
-| `create_board` | Create a new board |
-| `update_board` | Update a board |
-| `delete_board` | Delete a board |
-| `add_board_widget` | Add a widget (column) to a board |
-| `remove_board_widget` | Remove a widget from a board |
 
 ### Notifications
 | Tool | Description |

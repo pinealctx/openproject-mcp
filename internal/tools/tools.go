@@ -32,6 +32,9 @@ var toolGroups = map[string]ToolGroup{
 	"comment": {IsDefault: true, Tools: []string{
 		"list_work_package_activities", "create_work_package_comment",
 	}},
+	"attachment": {IsDefault: true, Tools: []string{
+		"list_work_package_attachments", "get_attachment",
+	}},
 	// Full-only mode groups
 	"membership": {IsDefault: false, Tools: []string{
 		"list_memberships", "get_membership", "create_membership",
@@ -238,6 +241,9 @@ func (r *Registry) RegisterAllTools(server *mcp.Server) {
 	}
 	if r.shouldRegisterGroup("comment") {
 		r.registerCommentTools(server)
+	}
+	if r.shouldRegisterGroup("attachment") {
+		r.registerAttachmentTools(server)
 	}
 	if r.shouldRegisterGroup("watcher") {
 		r.registerWatcherTools(server)

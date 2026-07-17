@@ -21,17 +21,20 @@ import (
 // Client wraps the generated OpenProject API client with authentication
 // and convenience methods.
 type Client struct {
-	apiClient *external.Client
-	baseURL   string
-	apiKey    string
-	logger    *slog.Logger
+	apiClient       *external.Client
+	httpClient      *http.Client
+	baseURL         string
+	apiKey          string
+	transferTimeout time.Duration
+	logger          *slog.Logger
 }
 
 // NewClient creates a new OpenProject API client from config.
 func NewClient(cfg *config.Config) *Client {
 	serverURL := strings.TrimSuffix(cfg.OpenProjectURL, "/")
+	httpClient := newHTTPClient(cfg)
 	client, err := external.NewClient(serverURL,
-		external.WithHTTPClient(newHTTPClient(cfg)),
+		external.WithHTTPClient(httpClient),
 		external.WithRequestEditorFn(basicAuthEditor(cfg.APIKey)),
 	)
 	if err != nil {
@@ -39,10 +42,12 @@ func NewClient(cfg *config.Config) *Client {
 		return nil
 	}
 	return &Client{
-		apiClient: client,
-		baseURL:   serverURL,
-		apiKey:    cfg.APIKey,
-		logger:    slog.Default(),
+		apiClient:       client,
+		httpClient:      httpClient,
+		baseURL:         serverURL,
+		apiKey:          cfg.APIKey,
+		transferTimeout: cfg.TransferTimeout,
+		logger:          slog.Default(),
 	}
 }
 
@@ -50,19 +55,22 @@ func NewClient(cfg *config.Config) *Client {
 // Used by HTTP/SSE server for per-request client creation.
 func NewClientDirect(baseURL, apiKey string, timeout time.Duration) *Client {
 	serverURL := strings.TrimSuffix(baseURL, "/")
-	cfg := &config.Config{Timeout: timeout}
+	cfg := &config.Config{Timeout: timeout, TransferTimeout: 5 * time.Minute}
+	httpClient := newHTTPClient(cfg)
 	client, err := external.NewClient(serverURL,
-		external.WithHTTPClient(newHTTPClient(cfg)),
+		external.WithHTTPClient(httpClient),
 		external.WithRequestEditorFn(basicAuthEditor(apiKey)),
 	)
 	if err != nil {
 		return nil
 	}
 	return &Client{
-		apiClient: client,
-		baseURL:   serverURL,
-		apiKey:    apiKey,
-		logger:    slog.Default(),
+		apiClient:       client,
+		httpClient:      httpClient,
+		baseURL:         serverURL,
+		apiKey:          apiKey,
+		transferTimeout: cfg.TransferTimeout,
+		logger:          slog.Default(),
 	}
 }
 

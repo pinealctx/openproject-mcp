@@ -15,6 +15,7 @@ cmd/                     CLI commands and MCP server entrypoint
   root.go               Root cobra command, client init
   mcp.go                MCP server subcommand (stdio/sse/http)
   output.go             CLI output formatting (tabwriter + JSON)
+  attachment.go         Work package attachment CLI commands
   *.go                  One file per CLI domain (project, work_package, etc.)
 
 internal/
@@ -22,6 +23,7 @@ internal/
     config.go           Config struct, Load(), Validate()
   openproject/          Adapter wrapping the external API client
     client.go           Client struct, NewClient(), NewClientDirect(), APIClient()
+    attachments.go      Safe attachment metadata and streaming file transfers
   tools/                MCP tool handlers (one file per group)
     tools.go            Registry, tool mode selection, schema helpers
     helpers.go          Shared helpers (parseArgs, formatUser, etc.)
@@ -35,6 +37,7 @@ internal/
     search.go           search
     notifications.go    list/read notifications
     comments.go         list activities, create comment
+    attachments.go      read-only attachment metadata tools
     watchers.go         list/add/remove watchers
     groups.go           group CRUD
     documents.go        list/get/update documents
@@ -71,11 +74,11 @@ Three modes control which MCP tools are registered:
 
 | Mode | Tool Count | Config |
 |------|-----------|--------|
-| `default` | ~24 core tools | `TOOL_MODE=default` |
+| `default` | ~29 core tools | `TOOL_MODE=default` |
 | `full` | ~60+ all tools | `TOOL_MODE=full` |
 | `custom` | user-selected | `TOOL_MODE=custom ENABLED_TOOLS=list_projects,get_project` |
 
-Default groups: connection, project, work_package, user, version, search, comment
+Default groups: connection, project, work_package, user, version, search, comment, attachment
 Full-only groups: membership, relation, notification, watcher, group, document, query, placeholder, configuration
 
 ## Transports
@@ -101,3 +104,4 @@ make test                     # Run tests
 - `FormattableFormat("markdown")` is a named type, not `*string`
 - Tool schemas use `jsonschema.Schema` — build with `newSchema()`, `schemaStr()`, etc.
 - CLI output uses type switches in `cmd/output.go` — add new types there
+- Attachment download URLs are private adapter details; never expose signed URLs or send API credentials across origins

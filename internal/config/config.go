@@ -28,25 +28,27 @@ type Config struct {
 	Port      int    // Port for SSE/HTTP transport
 
 	// HTTP client settings
-	Timeout time.Duration
+	Timeout         time.Duration
+	TransferTimeout time.Duration
 
 	// Tool mode settings
-	ToolMode      string // "default", "full", "custom"
-	EnabledTools  string // comma-separated tool names for custom mode
+	ToolMode     string // "default", "full", "custom"
+	EnabledTools string // comma-separated tool names for custom mode
 }
 
 // Load reads configuration from environment variables.
 func Load() *Config {
 	return &Config{
-		OpenProjectURL: getEnv("OPENPROJECT_URL", ""),
-		APIKey:         getEnv("OPENPROJECT_API_KEY", ""),
-		ProxyURL:       getEnv("OPENPROJECT_PROXY", getEnv("HTTPS_PROXY", getEnv("HTTP_PROXY", ""))),
-		LogLevel:       getEnv("LOG_LEVEL", "info"),
-		Transport:      getEnv("TRANSPORT", "stdio"),
-		Port:           getEnvInt("PORT", 8080),
-		Timeout:        30 * time.Second,
-		ToolMode:       getEnv("TOOL_MODE", "default"),
-		EnabledTools:   getEnv("ENABLED_TOOLS", ""),
+		OpenProjectURL:  getEnv("OPENPROJECT_URL", ""),
+		APIKey:          getEnv("OPENPROJECT_API_KEY", ""),
+		ProxyURL:        getEnv("OPENPROJECT_PROXY", getEnv("HTTPS_PROXY", getEnv("HTTP_PROXY", ""))),
+		LogLevel:        getEnv("LOG_LEVEL", "info"),
+		Transport:       getEnv("TRANSPORT", "stdio"),
+		Port:            getEnvInt("PORT", 8080),
+		Timeout:         30 * time.Second,
+		TransferTimeout: getEnvDuration("OPENPROJECT_TRANSFER_TIMEOUT", 5*time.Minute),
+		ToolMode:        getEnv("TOOL_MODE", "default"),
+		EnabledTools:    getEnv("ENABLED_TOOLS", ""),
 	}
 }
 
@@ -129,6 +131,15 @@ func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intVal, err := strconv.Atoi(value); err == nil {
 			return intVal
+		}
+	}
+	return defaultValue
+}
+
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if duration, err := time.ParseDuration(value); err == nil && duration > 0 {
+			return duration
 		}
 	}
 	return defaultValue

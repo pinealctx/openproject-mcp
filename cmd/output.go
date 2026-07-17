@@ -73,9 +73,94 @@ func outputText(data interface{}) error {
 		return outputPriorityList(v)
 	case *external.PriorityModel:
 		return outputPriority(v)
+	case *projectapi.AttachmentCollection:
+		return outputAttachmentList(v)
+	case *projectapi.Attachment:
+		return outputAttachment(v)
+	case *projectapi.AttachmentDownloadResult:
+		return outputAttachmentDownload(v)
+	case *projectapi.AttachmentDownloadBatchResult:
+		return outputAttachmentDownloadBatch(v)
+	case *projectapi.AttachmentDeleteResult:
+		return outputAttachmentDelete(v)
 	default:
 		return outputJSON(data)
 	}
+}
+
+// --- Attachment output ---
+
+func outputAttachmentList(list *projectapi.AttachmentCollection) error {
+	w := newTabWriter()
+	_, _ = fmt.Fprintln(w, "ID\tFILENAME\tCONTENT TYPE\tSIZE\tSTATUS\tAUTHOR")
+	for _, attachment := range list.Attachments {
+		size := "-"
+		if attachment.FileSize != nil {
+			size = fmt.Sprintf("%d", *attachment.FileSize)
+		}
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
+			attachment.ID, attachment.FileName, attachment.ContentType, size, attachment.Status, attachment.Author)
+	}
+	return w.Flush()
+}
+
+func outputAttachment(attachment *projectapi.Attachment) error {
+	_, _ = fmt.Fprintf(outputWriter, "Attachment ID: %d\n", attachment.ID)
+	_, _ = fmt.Fprintf(outputWriter, "Work package ID: %d\n", attachment.WorkPackageID)
+	_, _ = fmt.Fprintf(outputWriter, "File name: %s\n", attachment.FileName)
+	if attachment.FileSize != nil {
+		_, _ = fmt.Fprintf(outputWriter, "File size: %d bytes\n", *attachment.FileSize)
+	}
+	_, _ = fmt.Fprintf(outputWriter, "Content type: %s\n", attachment.ContentType)
+	_, _ = fmt.Fprintf(outputWriter, "Status: %s\n", attachment.Status)
+	if attachment.Author != "" {
+		_, _ = fmt.Fprintf(outputWriter, "Author: %s\n", attachment.Author)
+	}
+	if attachment.Description != "" {
+		_, _ = fmt.Fprintf(outputWriter, "Description: %s\n", attachment.Description)
+	}
+	if !attachment.CreatedAt.IsZero() {
+		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", attachment.CreatedAt.Format("2006-01-02 15:04:05"))
+	}
+	if digest := attachment.Digest.Algorithm + ":" + attachment.Digest.Hash; attachment.Digest.Algorithm != "" && attachment.Digest.Hash != "" {
+		_, _ = fmt.Fprintf(outputWriter, "Digest: %s\n", digest)
+	}
+	return nil
+}
+
+func outputAttachmentDownload(result *projectapi.AttachmentDownloadResult) error {
+	_, _ = fmt.Fprintf(outputWriter, "Saved: %s\n", result.Path)
+	_, _ = fmt.Fprintf(outputWriter, "Attachment ID: %d\n", result.AttachmentID)
+	_, _ = fmt.Fprintf(outputWriter, "Work package ID: %d\n", result.WorkPackageID)
+	_, _ = fmt.Fprintf(outputWriter, "File name: %s\n", result.FileName)
+	_, _ = fmt.Fprintf(outputWriter, "Bytes written: %d\n", result.BytesWritten)
+	if result.Digest != "" {
+		_, _ = fmt.Fprintf(outputWriter, "Digest: %s\n", result.Digest)
+		_, _ = fmt.Fprintf(outputWriter, "Digest verified: %t\n", result.DigestVerified)
+	}
+	if result.Warning != "" {
+		_, _ = fmt.Fprintf(outputWriter, "Warning: %s\n", result.Warning)
+	}
+	return nil
+}
+
+func outputAttachmentDownloadBatch(result *projectapi.AttachmentDownloadBatchResult) error {
+	_, _ = fmt.Fprintf(outputWriter, "Directory: %s\n", result.Directory)
+	_, _ = fmt.Fprintf(outputWriter, "Downloaded: %d\n", len(result.Downloaded))
+	_, _ = fmt.Fprintf(outputWriter, "Failed: %d\n", len(result.Failed))
+	for _, downloaded := range result.Downloaded {
+		_, _ = fmt.Fprintf(outputWriter, "Saved attachment #%d: %s\n", downloaded.AttachmentID, downloaded.Path)
+	}
+	for _, failed := range result.Failed {
+		_, _ = fmt.Fprintf(outputWriter, "Failed attachment #%d (%s): %s\n", failed.AttachmentID, failed.FileName, failed.Error)
+	}
+	return nil
+}
+
+func outputAttachmentDelete(result *projectapi.AttachmentDeleteResult) error {
+	_, _ = fmt.Fprintf(outputWriter, "Deleted attachment #%d (%s) from work package #%d\n",
+		result.Attachment.ID, result.Attachment.FileName, result.Attachment.WorkPackageID)
+	return nil
 }
 
 func newTabWriter() *tabwriter.Writer {

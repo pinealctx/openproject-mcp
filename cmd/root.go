@@ -20,10 +20,11 @@ var (
 	Version = "dev"
 
 	// Global flags
-	flagURL     string
-	flagAPIKey  string
-	flagOutput  string
-	flagVerbose bool
+	flagURL             string
+	flagAPIKey          string
+	flagOutput          string
+	flagVerbose         bool
+	flagTransferTimeout time.Duration
 
 	// Global client and context
 	client *openproject.Client
@@ -40,7 +41,7 @@ and an MCP server for AI assistants.
 This tool can be used in two modes:
 
 1. CLI Mode: Direct command-line interaction with OpenProject API
-   - Manage projects, work packages, users, time entries, etc.
+   - Manage projects, work packages, attachments, users, and memberships
    - Search and query OpenProject data
    - Scriptable for automation and CI/CD integration
 
@@ -72,6 +73,9 @@ Examples:
   # List work packages in a project
   openproject-mcp wp list -p 42
 
+  # Download all attachments for a work package
+  openproject-mcp attachment download-all 42
+
   # Search for items
   openproject-mcp search "bug report"
 
@@ -94,6 +98,9 @@ When run without a subcommand, it starts the MCP server in stdio mode.`,
 		}
 		if flagAPIKey != "" {
 			cfg.APIKey = flagAPIKey
+		}
+		if flagTransferTimeout > 0 {
+			cfg.TransferTimeout = flagTransferTimeout
 		}
 
 		// Validate credentials
@@ -129,6 +136,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagAPIKey, "api-key", "", "API key (or OPENPROJECT_API_KEY env)")
 	rootCmd.PersistentFlags().StringVarP(&flagOutput, "output", "o", "text", "Output format: text, json")
 	rootCmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().DurationVar(&flagTransferTimeout, "transfer-timeout", 0, "File transfer timeout (default 5m or OPENPROJECT_TRANSFER_TIMEOUT)")
 
 	// Set version
 	rootCmd.Version = Version
@@ -160,6 +168,9 @@ func getClient() *openproject.Client {
 		}
 		if flagAPIKey != "" {
 			cfg.APIKey = flagAPIKey
+		}
+		if flagTransferTimeout > 0 {
+			cfg.TransferTimeout = flagTransferTimeout
 		}
 		cfg.Timeout = 30 * time.Second
 		client = openproject.NewClient(cfg)
