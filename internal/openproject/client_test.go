@@ -1,12 +1,41 @@
 package openproject
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestConnectionUsesCurrentUserEndpoint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/v3/users/me" {
+			t.Errorf("TestConnection requested %q, want /api/v3/users/me", request.URL.Path)
+			http.NotFound(response, request)
+			return
+		}
+		username, password, ok := request.BasicAuth()
+		if !ok || username != "apikey" || password != "token" {
+			t.Errorf("TestConnection sent unexpected credentials")
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(response, `{"_type":"User","id":7,"login":"team-member"}`)
+	}))
+	defer server.Close()
+
+	client := NewClientDirect(server.URL, "token", time.Second)
+	user, err := client.TestConnection(context.Background())
+	if err != nil {
+		t.Fatalf("TestConnection returned error: %v", err)
+	}
+	if user.Id != 7 || user.Login == nil || *user.Login != "team-member" {
+		t.Fatalf("TestConnection returned unexpected user: %#v", user)
+	}
+}
 
 func TestReadResponseReturnsEnglishAPIError(t *testing.T) {
 	response := &http.Response{

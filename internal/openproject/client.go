@@ -181,16 +181,6 @@ func (c *Client) Delete(ctx context.Context, path string) error {
 
 // TestConnection tests the connection by fetching the current user.
 func (c *Client) TestConnection(ctx context.Context) (*external.UserModel, error) {
-	resp, err := c.apiClient.ListUsers(ctx, &external.ListUsersParams{
-		Filters:  ptr(`[{"status":{"operator":"!","values":["*"]}}]`),
-		PageSize: ptr(1),
-	})
-	if resp != nil {
-		defer func() { _ = resp.Body.Close() }()
-	}
-	if err := DecodeResponse(resp, err, nil); err != nil {
-		return nil, err
-	}
 	return c.GetCurrentUser(ctx)
 }
 
