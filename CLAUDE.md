@@ -65,6 +65,7 @@ Key API method naming differences:
 - `ListAllPriorities` (not `ListPriorities`)
 - `CreateProjectWorkPackage` takes `WorkPackageModel` body
 - `UpdateWorkPackage` uses `WorkPackagePatchModel` (requires `LockVersion`)
+- OpenProject's UI field `Accountable` maps to the API link `responsible`; `Assignee` maps to `assignee`. Keep both roles distinct in CLI and MCP interfaces.
 
 Auth is injected via `external.WithRequestEditorFn(basicAuthEditor(apiKey))`.
 

@@ -28,23 +28,27 @@ type CreateWorkPackageArgs struct {
 	TypeID        int    `json:"typeId,omitempty"`
 	StatusID      int    `json:"statusId,omitempty"`
 	PriorityID    int    `json:"priorityId,omitempty"`
-	AssigneeID    int    `json:"assigneeId,omitempty"`
+	AssigneeID    *int   `json:"assigneeId,omitempty"`
+	AccountableID *int   `json:"accountableId,omitempty"`
 	StartDate     string `json:"startDate,omitempty"`
 	DueDate       string `json:"dueDate,omitempty"`
 	EstimatedTime string `json:"estimatedTime,omitempty"`
 }
 
 type UpdateWorkPackageArgs struct {
-	ID             int    `json:"id"`
-	Subject        string `json:"subject,omitempty"`
-	Description    string `json:"description,omitempty"`
-	StatusID       int    `json:"statusId,omitempty"`
-	PriorityID     int    `json:"priorityId,omitempty"`
-	AssigneeID     int    `json:"assigneeId,omitempty"`
-	StartDate      string `json:"startDate,omitempty"`
-	DueDate        string `json:"dueDate,omitempty"`
-	EstimatedTime  string `json:"estimatedTime,omitempty"`
-	PercentageDone *int   `json:"percentageDone,omitempty"`
+	ID               int    `json:"id"`
+	Subject          string `json:"subject,omitempty"`
+	Description      string `json:"description,omitempty"`
+	StatusID         int    `json:"statusId,omitempty"`
+	PriorityID       int    `json:"priorityId,omitempty"`
+	AssigneeID       *int   `json:"assigneeId,omitempty"`
+	AccountableID    *int   `json:"accountableId,omitempty"`
+	ClearAssignee    bool   `json:"clearAssignee,omitempty"`
+	ClearAccountable bool   `json:"clearAccountable,omitempty"`
+	StartDate        string `json:"startDate,omitempty"`
+	DueDate          string `json:"dueDate,omitempty"`
+	EstimatedTime    string `json:"estimatedTime,omitempty"`
+	PercentageDone   *int   `json:"percentageDone,omitempty"`
 }
 
 type DeleteWorkPackageArgs struct {
@@ -88,7 +92,8 @@ func (r *Registry) registerWorkPackageTools(server *mcp.Server) {
 			"typeId":        schemaInt("Type ID (task, bug, feature, etc.)"),
 			"statusId":      schemaInt("Status ID"),
 			"priorityId":    schemaInt("Priority ID"),
-			"assigneeId":    schemaInt("Assignee user ID"),
+			"assigneeId":    schemaInt("Assignee user ID (the person currently working on the work package)"),
+			"accountableId": schemaInt("Accountable user ID (the person responsible for delivery)"),
 			"startDate":     schemaStr("Start date (YYYY-MM-DD)"),
 			"dueDate":       schemaStr("Due date (YYYY-MM-DD)"),
 			"estimatedTime": schemaStr(`Estimated time in ISO 8601 duration, e.g. "PT4H" for 4 hours`),
@@ -97,16 +102,19 @@ func (r *Registry) registerWorkPackageTools(server *mcp.Server) {
 
 	addTool(server, "update_work_package", "Update an existing work package",
 		newSchema(schemaProps{
-			"id":             schemaInt("Work package ID"),
-			"subject":        schemaStr("New title / subject"),
-			"description":    schemaStr("New description"),
-			"statusId":       schemaInt("New status ID"),
-			"priorityId":     schemaInt("New priority ID"),
-			"assigneeId":     schemaInt("New assignee user ID"),
-			"startDate":      schemaStr("New start date (YYYY-MM-DD)"),
-			"dueDate":        schemaStr("New due date (YYYY-MM-DD)"),
-			"estimatedTime":  schemaStr(`New estimated time, e.g. "PT8H"`),
-			"percentageDone": schemaInt("Completion percentage (0-100)"),
+			"id":               schemaInt("Work package ID"),
+			"subject":          schemaStr("New title / subject"),
+			"description":      schemaStr("New description"),
+			"statusId":         schemaInt("New status ID"),
+			"priorityId":       schemaInt("New priority ID"),
+			"assigneeId":       schemaInt("New Assignee user ID (current worker)"),
+			"accountableId":    schemaInt("New Accountable user ID (delivery owner)"),
+			"clearAssignee":    schemaBool("Remove the current Assignee; cannot be combined with assigneeId"),
+			"clearAccountable": schemaBool("Remove the current Accountable; cannot be combined with accountableId"),
+			"startDate":        schemaStr("New start date (YYYY-MM-DD)"),
+			"dueDate":          schemaStr("New due date (YYYY-MM-DD)"),
+			"estimatedTime":    schemaStr(`New estimated time, e.g. "PT8H"`),
+			"percentageDone":   schemaInt("Completion percentage (0-100)"),
 		}, "id"),
 		r.updateWorkPackage)
 
@@ -154,17 +162,21 @@ func (r *Registry) listWorkPackages(ctx context.Context, req *mcp.CallToolReques
 
 	result := fmt.Sprintf("Found %d work packages:\n\n", list.Total)
 	for _, wp := range list.UnderscoreEmbedded.Elements {
-		status, assignee := "", ""
+		status, assignee, accountable := "", "", ""
 		if wp.UnderscoreLinks.Status.Title != nil {
 			status = *wp.UnderscoreLinks.Status.Title
 		}
 		if wp.UnderscoreLinks.Assignee != nil && wp.UnderscoreLinks.Assignee.Title != nil {
 			assignee = *wp.UnderscoreLinks.Assignee.Title
 		}
-		result += fmt.Sprintf("- **#%d %s** — Status: %s, Assignee: %s\n",
+		if wp.UnderscoreLinks.Responsible != nil && wp.UnderscoreLinks.Responsible.Title != nil {
+			accountable = *wp.UnderscoreLinks.Responsible.Title
+		}
+		result += fmt.Sprintf("- **#%d %s** — Status: %s, Assignee: %s, Accountable: %s\n",
 			derefInt(wp.Id), wp.Subject,
 			firstNonEmpty(status, "Unknown"),
-			firstNonEmpty(assignee, "Unassigned"))
+			firstNonEmpty(assignee, "Unassigned"),
+			firstNonEmpty(accountable, "Unassigned"))
 	}
 	return textResult(result), nil
 }
@@ -190,6 +202,11 @@ func (r *Registry) getWorkPackage(ctx context.Context, req *mcp.CallToolRequest)
 		result += fmt.Sprintf("- **Assignee:** %s\n", derefStr(wp.UnderscoreLinks.Assignee.Title))
 	} else {
 		result += "- **Assignee:** Unassigned\n"
+	}
+	if wp.UnderscoreLinks.Responsible != nil {
+		result += fmt.Sprintf("- **Accountable:** %s\n", derefStr(wp.UnderscoreLinks.Responsible.Title))
+	} else {
+		result += "- **Accountable:** Unassigned\n"
 	}
 	if wp.PercentageDone != nil {
 		result += fmt.Sprintf("- **Progress:** %d%%\n", *wp.PercentageDone)
@@ -226,6 +243,7 @@ func (r *Registry) createWorkPackage(ctx context.Context, req *mcp.CallToolReque
 		StatusID:      openproject.IntID(args.StatusID),
 		PriorityID:    openproject.IntID(args.PriorityID),
 		AssigneeID:    args.AssigneeID,
+		AccountableID: args.AccountableID,
 		StartDate:     args.StartDate,
 		DueDate:       args.DueDate,
 		EstimatedTime: args.EstimatedTime,
@@ -243,16 +261,19 @@ func (r *Registry) updateWorkPackage(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	wp, err := r.client.UpdateWorkPackage(ctx, openproject.WorkPackageUpdateInput{
-		ID:             args.ID,
-		Subject:        args.Subject,
-		Description:    args.Description,
-		StatusID:       openproject.IntID(args.StatusID),
-		PriorityID:     openproject.IntID(args.PriorityID),
-		AssigneeID:     args.AssigneeID,
-		StartDate:      args.StartDate,
-		DueDate:        args.DueDate,
-		EstimatedTime:  args.EstimatedTime,
-		PercentageDone: args.PercentageDone,
+		ID:               args.ID,
+		Subject:          args.Subject,
+		Description:      args.Description,
+		StatusID:         openproject.IntID(args.StatusID),
+		PriorityID:       openproject.IntID(args.PriorityID),
+		AssigneeID:       args.AssigneeID,
+		AccountableID:    args.AccountableID,
+		ClearAssignee:    args.ClearAssignee,
+		ClearAccountable: args.ClearAccountable,
+		StartDate:        args.StartDate,
+		DueDate:          args.DueDate,
+		EstimatedTime:    args.EstimatedTime,
+		PercentageDone:   args.PercentageDone,
 	})
 	if err != nil {
 		return errorResult("Failed to update work package: %v", err), nil

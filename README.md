@@ -72,8 +72,8 @@ openproject-mcp project create -n "My Project" -i "my-project"
 # List work packages in a project
 openproject-mcp wp list -p 42
 
-# Create a work package
-openproject-mcp wp create -p 42 -s "Implement feature X"
+# Create a work package with a current worker and delivery owner
+openproject-mcp wp create -p 42 -s "Implement feature X" --assignee 5 --accountable 8
 
 # Add a comment to a work package
 openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
@@ -120,9 +120,14 @@ openproject-mcp project delete 42
 # === Work Packages ===
 openproject-mcp wp list -p 42
 openproject-mcp wp get 123
+openproject-mcp wp available-assignees 123
 openproject-mcp wp create -p 42 -s "Fix login bug" -d "Description here"
 openproject-mcp wp update 123 --status "In Progress" --progress 50
+# Assignee is the current worker; Accountable is the delivery owner
 openproject-mcp wp update 123 --assignee 5
+openproject-mcp wp update 123 --accountable 8
+openproject-mcp wp update 123 --clear-assignee
+openproject-mcp wp update 123 --clear-accountable
 openproject-mcp wp activities 123
 openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
 openproject-mcp wp delete 123
@@ -338,8 +343,8 @@ Add to your Zed settings:
 | `list_work_packages` | List work packages with filters |
 | `list_project_work_packages` | List work packages in a specific project |
 | `get_work_package` | Get a work package by ID |
-| `create_work_package` | Create a work package |
-| `update_work_package` | Update a work package (auto-fetches lockVersion) |
+| `create_work_package` | Create a work package, optionally setting Assignee and Accountable |
+| `update_work_package` | Update a work package, including setting or clearing Assignee and Accountable (auto-fetches lockVersion) |
 | `delete_work_package` | Delete a work package |
 | `list_work_package_activities` | List activities and comments for a work package |
 | `create_work_package_comment` | Add a comment to a work package |
@@ -348,6 +353,7 @@ Add to your Zed settings:
 | `list_types` | List available work package types |
 | `list_statuses` | List available work package statuses |
 | `list_priorities` | List available work package priorities |
+| `list_available_assignees` | List users available for the Assignee field |
 
 ### Work Package Hierarchy & Relations
 | Tool | Description |

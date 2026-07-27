@@ -21,19 +21,23 @@ var (
 	wpCreateStatus        string
 	wpCreatePriority      string
 	wpCreateAssignee      int
+	wpCreateAccountable   int
 	wpCreateStartDate     string
 	wpCreateDueDate       string
 	wpCreateEstimatedTime string
 
-	wpUpdateSubject       string
-	wpUpdateDescription   string
-	wpUpdateStatus        string
-	wpUpdatePriority      string
-	wpUpdateAssignee      int
-	wpUpdateStartDate     string
-	wpUpdateDueDate       string
-	wpUpdateEstimatedTime string
-	wpUpdateProgress      int
+	wpUpdateSubject          string
+	wpUpdateDescription      string
+	wpUpdateStatus           string
+	wpUpdatePriority         string
+	wpUpdateAssignee         int
+	wpUpdateAccountable      int
+	wpUpdateClearAssignee    bool
+	wpUpdateClearAccountable bool
+	wpUpdateStartDate        string
+	wpUpdateDueDate          string
+	wpUpdateEstimatedTime    string
+	wpUpdateProgress         int
 
 	wpRelationFromID int
 	wpRelationToID   int
@@ -64,6 +68,7 @@ and linked together with various relation types.
 Available subcommands:
   list          List work packages (optionally filtered by project)
   get           Get details of a specific work package
+  available-assignees List users available for the Assignee field
   create        Create a new work package
   update        Update work package properties
   delete        Delete a work package
@@ -96,8 +101,11 @@ Examples:
   # Update progress
   openproject-mcp wp update 123 --progress 75
 
-  # Assign work package
+  # Set the current worker (Assignee)
   openproject-mcp wp update 123 --assignee 5
+
+  # Set the delivery owner (Accountable)
+  openproject-mcp wp update 123 --accountable 8
 
   # Add a comment
   openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes."
@@ -167,6 +175,24 @@ var wpGetCmd = &cobra.Command{
 	},
 }
 
+var wpAvailableAssigneesCmd = &cobra.Command{
+	Use:     "available-assignees <id>",
+	Aliases: []string{"assignees"},
+	Short:   "List users available for the Assignee field",
+	Args:    cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id, err := positiveID(args[0], "work package")
+		if err != nil {
+			return err
+		}
+		result, err := getClient().ListWorkPackageAvailableAssignees(getContext(), id)
+		if err != nil {
+			return err
+		}
+		return output(result)
+	},
+}
+
 var wpCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new work package",
@@ -178,7 +204,8 @@ var wpCreateCmd = &cobra.Command{
 			TypeID:        wpCreateType,
 			StatusID:      wpCreateStatus,
 			PriorityID:    wpCreatePriority,
-			AssigneeID:    wpCreateAssignee,
+			AssigneeID:    optionalIntFlag(cmd, "assignee", wpCreateAssignee),
+			AccountableID: optionalIntFlag(cmd, "accountable", wpCreateAccountable),
 			StartDate:     wpCreateStartDate,
 			DueDate:       wpCreateDueDate,
 			EstimatedTime: wpCreateEstimatedTime,
@@ -206,16 +233,19 @@ var wpUpdateCmd = &cobra.Command{
 		}
 
 		result, err := getClient().UpdateWorkPackage(getContext(), openproject.WorkPackageUpdateInput{
-			ID:             id,
-			Subject:        wpUpdateSubject,
-			Description:    wpUpdateDescription,
-			StatusID:       wpUpdateStatus,
-			PriorityID:     wpUpdatePriority,
-			AssigneeID:     wpUpdateAssignee,
-			StartDate:      wpUpdateStartDate,
-			DueDate:        wpUpdateDueDate,
-			EstimatedTime:  wpUpdateEstimatedTime,
-			PercentageDone: percentageDone,
+			ID:               id,
+			Subject:          wpUpdateSubject,
+			Description:      wpUpdateDescription,
+			StatusID:         wpUpdateStatus,
+			PriorityID:       wpUpdatePriority,
+			AssigneeID:       optionalIntFlag(cmd, "assignee", wpUpdateAssignee),
+			AccountableID:    optionalIntFlag(cmd, "accountable", wpUpdateAccountable),
+			ClearAssignee:    wpUpdateClearAssignee,
+			ClearAccountable: wpUpdateClearAccountable,
+			StartDate:        wpUpdateStartDate,
+			DueDate:          wpUpdateDueDate,
+			EstimatedTime:    wpUpdateEstimatedTime,
+			PercentageDone:   percentageDone,
 		})
 		if err != nil {
 			return err
@@ -418,6 +448,7 @@ func init() {
 	rootCmd.AddCommand(workPackageCmd)
 	workPackageCmd.AddCommand(wpListCmd)
 	workPackageCmd.AddCommand(wpGetCmd)
+	workPackageCmd.AddCommand(wpAvailableAssigneesCmd)
 	workPackageCmd.AddCommand(wpCreateCmd)
 	workPackageCmd.AddCommand(wpUpdateCmd)
 	workPackageCmd.AddCommand(wpDeleteCmd)
@@ -446,7 +477,8 @@ func init() {
 	wpCreateCmd.Flags().StringVar(&wpCreateType, "type", "", "Type ID or name")
 	wpCreateCmd.Flags().StringVar(&wpCreateStatus, "status", "", "Status ID")
 	wpCreateCmd.Flags().StringVar(&wpCreatePriority, "priority", "", "Priority ID")
-	wpCreateCmd.Flags().IntVar(&wpCreateAssignee, "assignee", 0, "Assignee user ID")
+	wpCreateCmd.Flags().IntVar(&wpCreateAssignee, "assignee", 0, "Assignee (current worker) user ID")
+	wpCreateCmd.Flags().IntVar(&wpCreateAccountable, "accountable", 0, "Accountable (delivery owner) user ID")
 	wpCreateCmd.Flags().StringVar(&wpCreateStartDate, "start", "", "Start date (YYYY-MM-DD)")
 	wpCreateCmd.Flags().StringVar(&wpCreateDueDate, "due", "", "Due date (YYYY-MM-DD)")
 	wpCreateCmd.Flags().StringVar(&wpCreateEstimatedTime, "estimate", "", "Estimated time (e.g., PT4H)")
@@ -458,11 +490,16 @@ func init() {
 	wpUpdateCmd.Flags().StringVarP(&wpUpdateDescription, "description", "d", "", "Description")
 	wpUpdateCmd.Flags().StringVar(&wpUpdateStatus, "status", "", "Status ID")
 	wpUpdateCmd.Flags().StringVar(&wpUpdatePriority, "priority", "", "Priority ID")
-	wpUpdateCmd.Flags().IntVar(&wpUpdateAssignee, "assignee", 0, "Assignee user ID")
+	wpUpdateCmd.Flags().IntVar(&wpUpdateAssignee, "assignee", 0, "Assignee (current worker) user ID")
+	wpUpdateCmd.Flags().IntVar(&wpUpdateAccountable, "accountable", 0, "Accountable (delivery owner) user ID")
+	wpUpdateCmd.Flags().BoolVar(&wpUpdateClearAssignee, "clear-assignee", false, "Remove the current Assignee")
+	wpUpdateCmd.Flags().BoolVar(&wpUpdateClearAccountable, "clear-accountable", false, "Remove the current Accountable")
 	wpUpdateCmd.Flags().StringVar(&wpUpdateStartDate, "start", "", "Start date (YYYY-MM-DD)")
 	wpUpdateCmd.Flags().StringVar(&wpUpdateDueDate, "due", "", "Due date (YYYY-MM-DD)")
 	wpUpdateCmd.Flags().StringVar(&wpUpdateEstimatedTime, "estimate", "", "Estimated time (e.g., PT4H)")
 	wpUpdateCmd.Flags().IntVarP(&wpUpdateProgress, "progress", "r", 0, "Percentage done (0-100)")
+	wpUpdateCmd.MarkFlagsMutuallyExclusive("assignee", "clear-assignee")
+	wpUpdateCmd.MarkFlagsMutuallyExclusive("accountable", "clear-accountable")
 
 	// Comment flags
 	wpCommentCmd.Flags().StringVarP(&wpCommentMessage, "message", "m", "", "Comment text in markdown (required)")
@@ -481,4 +518,11 @@ func init() {
 	wpRelationCreateCmd.Flags().IntVar(&wpRelationDelay, "delay", 0, "Delay in days")
 	_ = wpRelationCreateCmd.MarkFlagRequired("from")
 	_ = wpRelationCreateCmd.MarkFlagRequired("to")
+}
+
+func optionalIntFlag(cmd *cobra.Command, name string, value int) *int {
+	if !cmd.Flags().Changed(name) {
+		return nil
+	}
+	return ptr(value)
 }

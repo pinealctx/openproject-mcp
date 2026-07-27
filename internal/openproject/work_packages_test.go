@@ -24,13 +24,16 @@ func TestUpdateWorkPackageFetchesLockVersionBeforePatch(t *testing.T) {
 	defer closeServer()
 
 	progress := 65
+	assigneeID := 9
+	accountableID := 10
 	wp, err := client.UpdateWorkPackage(context.Background(), WorkPackageUpdateInput{
 		ID:             42,
 		Subject:        "Updated subject",
 		Description:    "Updated body",
 		StatusID:       "1",
 		PriorityID:     "8",
-		AssigneeID:     9,
+		AssigneeID:     &assigneeID,
+		AccountableID:  &accountableID,
 		StartDate:      "2026-07-01",
 		DueDate:        "2026-07-15",
 		EstimatedTime:  "PT4H",
@@ -58,6 +61,93 @@ func TestUpdateWorkPackageFetchesLockVersionBeforePatch(t *testing.T) {
 	assertEqual(t, nestedValue(t, patchBody, "_links", "status", "href"), "/api/v3/statuses/1")
 	assertEqual(t, nestedValue(t, patchBody, "_links", "priority", "href"), "/api/v3/priorities/8")
 	assertEqual(t, nestedValue(t, patchBody, "_links", "assignee", "href"), "/api/v3/users/9")
+	assertEqual(t, nestedValue(t, patchBody, "_links", "responsible", "href"), "/api/v3/users/10")
+}
+
+func TestCreateWorkPackageSetsAssigneeAndAccountable(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v3/projects/3/work_packages" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Fatalf("decode create body: %v", err)
+		}
+		writeJSON(t, w, map[string]any{"_type": "WorkPackage", "id": 42, "subject": "New task"})
+	}))
+	defer server.Close()
+
+	assigneeID := 9
+	accountableID := 10
+	client := NewClientDirect(server.URL, "token", time.Second)
+	if _, err := client.CreateWorkPackage(context.Background(), WorkPackageCreateInput{
+		ProjectID:     3,
+		Subject:       "New task",
+		AssigneeID:    &assigneeID,
+		AccountableID: &accountableID,
+	}); err != nil {
+		t.Fatalf("CreateWorkPackage returned error: %v", err)
+	}
+
+	assertEqual(t, nestedValue(t, requestBody, "_links", "assignee", "href"), "/api/v3/users/9")
+	assertEqual(t, nestedValue(t, requestBody, "_links", "responsible", "href"), "/api/v3/users/10")
+}
+
+func TestUpdateWorkPackageClearsAssigneeAndAccountable(t *testing.T) {
+	var patchBody map[string]any
+	client, closeServer := newWorkPackageTestClient(t, 7, func(r *http.Request, body map[string]any) {
+		if r.Method == http.MethodPatch {
+			patchBody = body
+		}
+	})
+	defer closeServer()
+
+	if _, err := client.UpdateWorkPackage(context.Background(), WorkPackageUpdateInput{
+		ID:               42,
+		ClearAssignee:    true,
+		ClearAccountable: true,
+	}); err != nil {
+		t.Fatalf("UpdateWorkPackage returned error: %v", err)
+	}
+
+	assertNilLinkHref(t, patchBody, "assignee")
+	assertNilLinkHref(t, patchBody, "responsible")
+}
+
+func TestWorkPackagePeopleValidationRunsBeforeNetwork(t *testing.T) {
+	client := NewClientDirect("https://project.example", "token", time.Second)
+	client.apiClient.Client = failingDoer{}
+
+	invalidID := 0
+	tests := []struct {
+		name  string
+		input WorkPackageUpdateInput
+		want  string
+	}{
+		{name: "invalid assignee", input: WorkPackageUpdateInput{ID: 42, AssigneeID: &invalidID}, want: "assignee user ID must be greater than zero"},
+		{name: "conflicting assignee", input: WorkPackageUpdateInput{ID: 42, AssigneeID: ptr(9), ClearAssignee: true}, want: "assignee cannot be set and cleared"},
+		{name: "invalid accountable", input: WorkPackageUpdateInput{ID: 42, AccountableID: &invalidID}, want: "accountable user ID must be greater than zero"},
+		{name: "conflicting accountable", input: WorkPackageUpdateInput{ID: 42, AccountableID: ptr(10), ClearAccountable: true}, want: "accountable cannot be set and cleared"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := client.UpdateWorkPackage(context.Background(), test.input)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("UpdateWorkPackage error = %v, want %q", err, test.want)
+			}
+		})
+	}
+
+	_, err := client.CreateWorkPackage(context.Background(), WorkPackageCreateInput{
+		ProjectID:     3,
+		Subject:       "New task",
+		AccountableID: &invalidID,
+	})
+	if err == nil || !strings.Contains(err.Error(), "accountable user ID must be greater than zero") {
+		t.Fatalf("CreateWorkPackage error = %v", err)
+	}
 }
 
 func TestSetAndRemoveWorkPackageParentUseCurrentLockVersion(t *testing.T) {
@@ -302,5 +392,16 @@ func assertNumber(t *testing.T, got any, want float64) {
 	}
 	if number != want {
 		t.Fatalf("got %v, want %v", number, want)
+	}
+}
+
+func assertNilLinkHref(t *testing.T, body map[string]any, linkName string) {
+	t.Helper()
+	link, ok := nestedValue(t, body, "_links", linkName).(map[string]any)
+	if !ok {
+		t.Fatalf("expected %s link map, got %#v", linkName, nestedValue(t, body, "_links", linkName))
+	}
+	if href, ok := link["href"]; !ok || href != nil {
+		t.Fatalf("expected nil %s href, got %#v", linkName, link)
 	}
 }

@@ -37,6 +37,8 @@ func outputText(data interface{}) error {
 		return outputWorkPackageList(v)
 	case *external.WorkPackageModel:
 		return outputWorkPackage(v)
+	case *external.AvailableAssigneesModel:
+		return outputAvailableAssignees(v)
 	case *external.UserCollectionModel:
 		return outputUserList(v)
 	case *external.UserModel:
@@ -221,15 +223,19 @@ func outputProject(p *external.ProjectModel) error {
 
 func outputWorkPackageList(list *external.WorkPackagesModel) error {
 	w := newTabWriter()
-	_, _ = fmt.Fprintln(w, "ID\tSUBJECT\tTYPE\tSTATUS\tASSIGNEE")
+	_, _ = fmt.Fprintln(w, "ID\tSUBJECT\tTYPE\tSTATUS\tASSIGNEE\tACCOUNTABLE")
 	for _, wp := range list.UnderscoreEmbedded.Elements {
 		assignee := "-"
 		if wp.UnderscoreLinks.Assignee != nil {
 			assignee = dStr(wp.UnderscoreLinks.Assignee.Title)
 		}
+		accountable := "-"
+		if wp.UnderscoreLinks.Responsible != nil {
+			accountable = dStr(wp.UnderscoreLinks.Responsible.Title)
+		}
 		typeName := dStr(wp.UnderscoreLinks.Type.Title)
 		statusName := dStr(wp.UnderscoreLinks.Status.Title)
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", dInt(wp.Id), truncate(wp.Subject, 40), typeName, statusName, assignee)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", dInt(wp.Id), truncate(wp.Subject, 40), typeName, statusName, assignee, accountable)
 	}
 	return w.Flush()
 }
@@ -245,6 +251,13 @@ func outputWorkPackage(wp *external.WorkPackageModel) error {
 	_, _ = fmt.Fprintf(outputWriter, "Priority: %s\n", dStr(wp.UnderscoreLinks.Priority.Title))
 	if wp.UnderscoreLinks.Assignee != nil {
 		_, _ = fmt.Fprintf(outputWriter, "Assignee: %s\n", dStr(wp.UnderscoreLinks.Assignee.Title))
+	} else {
+		_, _ = fmt.Fprintln(outputWriter, "Assignee: Unassigned")
+	}
+	if wp.UnderscoreLinks.Responsible != nil {
+		_, _ = fmt.Fprintf(outputWriter, "Accountable: %s\n", dStr(wp.UnderscoreLinks.Responsible.Title))
+	} else {
+		_, _ = fmt.Fprintln(outputWriter, "Accountable: Unassigned")
 	}
 	if wp.PercentageDone != nil {
 		_, _ = fmt.Fprintf(outputWriter, "Progress: %d%%\n", *wp.PercentageDone)
@@ -262,6 +275,17 @@ func outputWorkPackage(wp *external.WorkPackageModel) error {
 		_, _ = fmt.Fprintf(outputWriter, "Created: %s\n", wp.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 	return nil
+}
+
+func outputAvailableAssignees(list *external.AvailableAssigneesModel) error {
+	w := newTabWriter()
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tEMAIL")
+	if list.UnderscoreEmbedded.Elements != nil {
+		for _, user := range *list.UnderscoreEmbedded.Elements {
+			_, _ = fmt.Fprintf(w, "%d\t%s\t%s\n", user.Id, user.Name, dStr(user.Email))
+		}
+	}
+	return w.Flush()
 }
 
 // --- User output ---

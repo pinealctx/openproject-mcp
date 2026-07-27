@@ -27,7 +27,8 @@ type WorkPackageCreateInput struct {
 	TypeID        string
 	StatusID      string
 	PriorityID    string
-	AssigneeID    int
+	AssigneeID    *int
+	AccountableID *int
 	StartDate     string
 	DueDate       string
 	EstimatedTime string
@@ -35,18 +36,21 @@ type WorkPackageCreateInput struct {
 
 // WorkPackageUpdateInput describes a work package patch.
 type WorkPackageUpdateInput struct {
-	ID             int
-	Subject        string
-	Description    string
-	StatusID       string
-	PriorityID     string
-	AssigneeID     int
-	StartDate      string
-	DueDate        string
-	EstimatedTime  string
-	PercentageDone *int
-	ParentID       *int
-	ClearParent    bool
+	ID               int
+	Subject          string
+	Description      string
+	StatusID         string
+	PriorityID       string
+	AssigneeID       *int
+	AccountableID    *int
+	ClearAssignee    bool
+	ClearAccountable bool
+	StartDate        string
+	DueDate          string
+	EstimatedTime    string
+	PercentageDone   *int
+	ParentID         *int
+	ClearParent      bool
 }
 
 func (c *Client) ListWorkPackages(ctx context.Context, input WorkPackageListInput) (*external.WorkPackagesModel, error) {
@@ -80,6 +84,9 @@ func (c *Client) GetWorkPackage(ctx context.Context, id int) (*external.WorkPack
 }
 
 func (c *Client) CreateWorkPackage(ctx context.Context, input WorkPackageCreateInput) (*external.WorkPackageModel, error) {
+	if err := input.validate(); err != nil {
+		return nil, err
+	}
 	body := external.WorkPackageModel{
 		Subject: input.Subject,
 	}
@@ -105,8 +112,11 @@ func (c *Client) CreateWorkPackage(ctx context.Context, input WorkPackageCreateI
 	if input.PriorityID != "" {
 		body.UnderscoreLinks.Priority = external.Link{Href: ptr("/api/v3/priorities/" + input.PriorityID)}
 	}
-	if input.AssigneeID > 0 {
-		body.UnderscoreLinks.Assignee = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/users/%d", input.AssigneeID))}
+	if input.AssigneeID != nil {
+		body.UnderscoreLinks.Assignee = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/users/%d", *input.AssigneeID))}
+	}
+	if input.AccountableID != nil {
+		body.UnderscoreLinks.Responsible = &external.Link{Href: ptr(fmt.Sprintf("/api/v3/users/%d", *input.AccountableID))}
 	}
 
 	var wp external.WorkPackageModel
@@ -118,6 +128,9 @@ func (c *Client) CreateWorkPackage(ctx context.Context, input WorkPackageCreateI
 }
 
 func (c *Client) UpdateWorkPackage(ctx context.Context, input WorkPackageUpdateInput) (*external.WorkPackageModel, error) {
+	if err := input.validate(); err != nil {
+		return nil, err
+	}
 	current, err := c.GetWorkPackage(ctx, input.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fetch work package lock version: %w", err)
@@ -237,8 +250,17 @@ func (input WorkPackageUpdateInput) patchBody(lockVersion int) map[string]any {
 	if input.PriorityID != "" {
 		links["priority"] = map[string]any{"href": "/api/v3/priorities/" + input.PriorityID}
 	}
-	if input.AssigneeID > 0 {
-		links["assignee"] = map[string]any{"href": fmt.Sprintf("/api/v3/users/%d", input.AssigneeID)}
+	if input.AssigneeID != nil {
+		links["assignee"] = map[string]any{"href": fmt.Sprintf("/api/v3/users/%d", *input.AssigneeID)}
+	}
+	if input.ClearAssignee {
+		links["assignee"] = map[string]any{"href": nil}
+	}
+	if input.AccountableID != nil {
+		links["responsible"] = map[string]any{"href": fmt.Sprintf("/api/v3/users/%d", *input.AccountableID)}
+	}
+	if input.ClearAccountable {
+		links["responsible"] = map[string]any{"href": nil}
 	}
 	if input.ParentID != nil {
 		links["parent"] = map[string]any{"href": fmt.Sprintf("/api/v3/work_packages/%d", *input.ParentID)}
@@ -251,6 +273,32 @@ func (input WorkPackageUpdateInput) patchBody(lockVersion int) map[string]any {
 	}
 
 	return body
+}
+
+func (input WorkPackageUpdateInput) validate() error {
+	if input.AssigneeID != nil && *input.AssigneeID <= 0 {
+		return fmt.Errorf("assignee user ID must be greater than zero")
+	}
+	if input.AssigneeID != nil && input.ClearAssignee {
+		return fmt.Errorf("assignee cannot be set and cleared in the same update")
+	}
+	if input.AccountableID != nil && *input.AccountableID <= 0 {
+		return fmt.Errorf("accountable user ID must be greater than zero")
+	}
+	if input.AccountableID != nil && input.ClearAccountable {
+		return fmt.Errorf("accountable cannot be set and cleared in the same update")
+	}
+	return nil
+}
+
+func (input WorkPackageCreateInput) validate() error {
+	if input.AssigneeID != nil && *input.AssigneeID <= 0 {
+		return fmt.Errorf("assignee user ID must be greater than zero")
+	}
+	if input.AccountableID != nil && *input.AccountableID <= 0 {
+		return fmt.Errorf("accountable user ID must be greater than zero")
+	}
+	return nil
 }
 
 func applyWorkPackageListParams(offset, pageSize **int, sortBy, filters **string, input WorkPackageListInput) {
