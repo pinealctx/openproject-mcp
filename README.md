@@ -82,8 +82,8 @@ openproject-mcp wp comment 123 -m "Investigated and updated the deployment notes
 openproject-mcp attachment list 123
 openproject-mcp attachment download-all 123
 
-# Search across OpenProject
-openproject-mcp search "bug"
+# Search tickets by full text
+openproject-mcp search "bug" --type work_package
 
 # Output as JSON for scripting
 openproject-mcp project list -o json
@@ -99,7 +99,7 @@ openproject-mcp project list -o json
 | `user` | `u` | Manage users |
 | `membership` | `member`, `m` | Manage project memberships |
 | `notification` | `notify` | Manage notifications |
-| `search` | - | Search across projects, work packages, users |
+| `search` | - | Search work packages, projects, and accessible users through supported API filters |
 | `status` | - | List work package statuses |
 | `priority` | `priorities` | List work package priorities |
 | `type` | `types` | List work package types |
@@ -155,9 +155,10 @@ openproject-mcp membership create -p 42 -u 5 -r "3,4"
 openproject-mcp membership delete 123
 
 # === Search ===
-openproject-mcp search "bug"
+openproject-mcp search "bug" -t work_package
 openproject-mcp search "website" -t project
 openproject-mcp search "john" -t user
+openproject-mcp search "release" -l 5 -o json
 
 # === Notifications ===
 openproject-mcp notification list
@@ -166,6 +167,8 @@ openproject-mcp notification read-all
 ```
 
 Run `openproject-mcp [command] --help` for detailed usage of each command.
+
+Work package search uses OpenProject's full-text `search` filter. Project search matches names and identifiers, while user search matches names and email addresses when the authenticated account can list users. Omitting `--type` performs a best-effort aggregate search; inaccessible resource types are returned as warnings without hiding successful results. `--limit` is applied per resource type.
 
 ## Transport Modes
 
@@ -399,7 +402,7 @@ Add to your Zed settings:
 ### Search
 | Tool | Description |
 |------|-------------|
-| `search` | Search across projects, work packages, and users |
+| `search` | Search work packages, projects, and accessible users; aggregate searches return partial-access warnings |
 
 ## Build
 

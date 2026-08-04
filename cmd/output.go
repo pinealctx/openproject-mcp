@@ -85,9 +85,31 @@ func outputText(data interface{}) error {
 		return outputAttachmentDownloadBatch(v)
 	case *projectapi.AttachmentDeleteResult:
 		return outputAttachmentDelete(v)
+	case *projectapi.SearchResults:
+		return outputSearchResults(v)
 	default:
 		return outputJSON(data)
 	}
+}
+
+func outputSearchResults(results *projectapi.SearchResults) error {
+	_, _ = fmt.Fprintf(outputWriter, "Search: %s\nReturned: %d\nTotal: %d\n", results.Query, results.Count, results.Total)
+	w := newTabWriter()
+	_, _ = fmt.Fprintln(w, "TYPE\tID\tTITLE\tDETAIL")
+	for _, result := range results.Results {
+		detail := result.Identifier
+		if result.Status != "" {
+			detail = result.Status
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%d\t%s\t%s\n", result.Type, result.ID, result.Title, detail)
+	}
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	for _, warning := range results.Warnings {
+		_, _ = fmt.Fprintf(outputWriter, "Warning: %s\n", warning.Message)
+	}
+	return nil
 }
 
 // --- Attachment output ---

@@ -24,6 +24,7 @@ internal/
   openproject/          Adapter wrapping the external API client
     client.go           Client struct, NewClient(), NewClientDirect(), APIClient()
     attachments.go      Safe attachment metadata and streaming file transfers
+    search.go           Shared typed search service and concise result model
   tools/                MCP tool handlers (one file per group)
     tools.go            Registry, tool mode selection, schema helpers
     helpers.go          Shared helpers (parseArgs, formatUser, etc.)
@@ -66,6 +67,7 @@ Key API method naming differences:
 - `CreateProjectWorkPackage` takes `WorkPackageModel` body
 - `UpdateWorkPackage` uses `WorkPackagePatchModel` (requires `LockVersion`)
 - OpenProject's UI field `Accountable` maps to the API link `responsible`; `Assignee` maps to `assignee`. Keep both roles distinct in CLI and MCP interfaces.
+- OpenProject API v3 has no generic `/search` endpoint. Use collection filters through `internal/openproject.Search`: `search` for work packages, `name_and_identifier` for projects, and `name` for users. Build filter JSON with `encoding/json`, never string interpolation.
 
 Auth is injected via `external.WithRequestEditorFn(basicAuthEditor(apiKey))`.
 

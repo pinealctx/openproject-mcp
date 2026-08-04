@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	external "github.com/pinealctx/openproject"
 	"github.com/pinealctx/openproject-mcp/internal/openproject"
 )
 
@@ -18,12 +17,12 @@ type SearchArgs struct {
 // registerSearchTools registers the cross-resource search tool.
 func (r *Registry) registerSearchTools(server *mcp.Server) {
 	addTool(server, "search",
-		"Search for projects, work packages, or users by keyword",
+		"Search projects, work packages, or users by keyword using supported OpenProject collection filters",
 		newSchema(schemaProps{
 			"query": schemaStr("Search keyword"),
-			"type":  schemaEnum("Resource type to search", "project", "work_package", "user"),
-			"limit": schemaInt("Maximum number of results (default: 10)"),
-		}, "query", "type"),
+			"type":  schemaEnum("Optional resource type; omit to search all accessible types", "project", "work_package", "user"),
+			"limit": schemaInt("Maximum results per resource type (default: 10, maximum: 100)"),
+		}, "query"),
 		r.search)
 }
 
@@ -33,73 +32,31 @@ func (r *Registry) search(ctx context.Context, req *mcp.CallToolRequest) (*mcp.C
 		return errorResult("Invalid arguments: %v", err), nil
 	}
 
-	limit := args.Limit
-	if limit <= 0 {
-		limit = 10
+	results, err := r.client.Search(ctx, openproject.SearchInput{
+		Query: args.Query,
+		Type:  args.Type,
+		Limit: args.Limit,
+	})
+	if err != nil {
+		return errorResult("Search failed: %v", err), nil
 	}
+	return textResult(formatSearchResults(results)), nil
+}
 
-	switch args.Type {
-	case "project":
-		params := &external.ListProjectsParams{
-			Filters: strPtr(fmt.Sprintf(`[{"name_and_identifier":{"operator":"~","values":["%s"]}}]`, args.Query)),
+func formatSearchResults(results *openproject.SearchResults) string {
+	text := fmt.Sprintf("Found %d of %d matching resources for %q:\n\n", results.Count, results.Total, results.Query)
+	for _, result := range results.Results {
+		detail := result.Identifier
+		if result.Status != "" {
+			detail = result.Status
 		}
-		resp, err := r.client.APIClient().ListProjects(ctx, params)
-		if err != nil {
-			return errorResult("Search failed: %v", err), nil
+		if detail != "" {
+			detail = " - " + detail
 		}
-		var list external.ProjectCollectionModel
-		if err := openproject.ReadResponse(resp, &list); err != nil {
-			return errorResult("Search failed: %v", err), nil
-		}
-		result := fmt.Sprintf("Found %d projects matching \"%s\":\n\n", list.Total, args.Query)
-		for _, p := range list.UnderscoreEmbedded.Elements {
-			result += fmt.Sprintf("- **%s** (ID: %d) — %s\n", derefStr(p.Name), derefInt(p.Id), derefStr(p.Identifier))
-		}
-		return textResult(result), nil
-
-	case "work_package":
-		params := &external.ListWorkPackagesParams{
-			PageSize: intPtr(limit),
-			Filters:  strPtr(fmt.Sprintf(`[{"subject":{"operator":"~","values":["%s"]}}]`, args.Query)),
-		}
-		resp, err := r.client.APIClient().ListWorkPackages(ctx, params)
-		if err != nil {
-			return errorResult("Search failed: %v", err), nil
-		}
-		var list external.WorkPackagesModel
-		if err := openproject.ReadResponse(resp, &list); err != nil {
-			return errorResult("Search failed: %v", err), nil
-		}
-		result := fmt.Sprintf("Found %d work packages matching \"%s\":\n\n", list.Total, args.Query)
-		for _, wp := range list.UnderscoreEmbedded.Elements {
-			status := ""
-			if wp.UnderscoreLinks.Status.Title != nil {
-				status = " — " + *wp.UnderscoreLinks.Status.Title
-			}
-			result += fmt.Sprintf("- **#%d %s**%s\n", derefInt(wp.Id), wp.Subject, status)
-		}
-		return textResult(result), nil
-
-	case "user":
-		params := &external.ListUsersParams{
-			PageSize: intPtr(limit),
-			Filters:  strPtr(fmt.Sprintf(`[{"name":{"operator":"~","values":["%s"]}}]`, args.Query)),
-		}
-		resp, err := r.client.APIClient().ListUsers(ctx, params)
-		if err != nil {
-			return errorResult("Search failed: %v", err), nil
-		}
-		var list external.UserCollectionModel
-		if err := openproject.ReadResponse(resp, &list); err != nil {
-			return errorResult("Search failed: %v", err), nil
-		}
-		result := fmt.Sprintf("Found %d users matching \"%s\":\n\n", list.Total, args.Query)
-		for _, u := range list.UnderscoreEmbedded.Elements {
-			result += fmt.Sprintf("- **%s** (ID: %d) — %s\n", u.Name, u.Id, derefStr(u.Email))
-		}
-		return textResult(result), nil
-
-	default:
-		return errorResult("Unknown type %q; must be project, work_package, or user", args.Type), nil
+		text += fmt.Sprintf("- **[%s] #%d %s**%s\n", result.Type, result.ID, result.Title, detail)
 	}
+	for _, warning := range results.Warnings {
+		text += fmt.Sprintf("\nWarning: %s\n", warning.Message)
+	}
+	return text
 }

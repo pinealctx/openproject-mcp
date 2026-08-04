@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-	"net/url"
-
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +16,9 @@ var searchCmd = &cobra.Command{
 	Short: "Search OpenProject",
 	Long: `Search across OpenProject resources.
 
-Provides full-text search across projects, work packages, and users.
-Results are ranked by relevance and can be filtered by resource type.
+Searches projects, work packages, and users through their supported API filters.
+Without --type, each resource type is queried independently and inaccessible
+types are reported as warnings without hiding successful results.
 
 Examples:
   # Search for all items containing "bug"
@@ -41,15 +40,12 @@ Examples:
   openproject-mcp search "urgent" -o json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		query := args[0]
-		// Build search URL
-		path := fmt.Sprintf("/search?query=%s&limit=%d", url.QueryEscape(query), searchLimit)
-		if searchType != "" {
-			path += fmt.Sprintf("&type=%s", url.QueryEscape(searchType))
-		}
-
-		var result interface{}
-		if err := getClient().Get(getContext(), path, &result); err != nil {
+		result, err := getClient().Search(getContext(), openproject.SearchInput{
+			Query: args[0],
+			Type:  searchType,
+			Limit: searchLimit,
+		})
+		if err != nil {
 			return err
 		}
 		return output(result)
@@ -59,6 +55,6 @@ Examples:
 func init() {
 	rootCmd.AddCommand(searchCmd)
 
-	searchCmd.Flags().StringVarP(&searchType, "type", "t", "", "Resource type to search (project, work_package, user)")
-	searchCmd.Flags().IntVarP(&searchLimit, "limit", "l", 10, "Maximum number of results")
+	searchCmd.Flags().StringVarP(&searchType, "type", "t", "", "Resource type to search: project, work_package, or user")
+	searchCmd.Flags().IntVarP(&searchLimit, "limit", "l", openproject.DefaultSearchLimit, "Maximum results per resource type")
 }
