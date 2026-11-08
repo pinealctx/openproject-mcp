@@ -25,7 +25,7 @@ func (r *Registry) registerNotificationTools(server *mcp.Server) {
 		newSchema(schemaProps{
 			"unread":   schemaBool("When true, return only unread notifications (default: false = all)"),
 			"pageSize": schemaInt("Number of results per page"),
-			"offset":   schemaInt("Pagination offset"),
+			"offset":   schemaInt("Page number (starts at 1)"),
 		}),
 		r.listNotifications)
 
@@ -77,7 +77,7 @@ func (r *Registry) listNotifications(ctx context.Context, req *mcp.CallToolReque
 	if args.Unread {
 		label = "unread"
 	}
-	result := fmt.Sprintf("Found %d %s notifications:\n\n", list.Total, label)
+	result := fmt.Sprintf("Showing %d of %d %s notifications:\n\n", len(list.UnderscoreEmbedded.Elements), list.Total, label)
 
 	for _, n := range list.UnderscoreEmbedded.Elements {
 		read := "unread"

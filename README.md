@@ -72,6 +72,9 @@ openproject-mcp project create -n "My Project" -i "my-project"
 # List work packages in a project
 openproject-mcp wp list -p 42
 
+# Read another page (offset is a page number, starting at 1)
+openproject-mcp wp list -p 42 --offset 2 --page-size 20
+
 # Create a work package with a current worker and delivery owner
 openproject-mcp wp create -p 42 -s "Implement feature X" --assignee 5 --accountable 8
 
@@ -416,3 +419,11 @@ make clean          # Remove build artifacts
 ## License
 
 MIT
+
+### Collection pagination
+
+Use `--offset` (page number, starting at 1) and `--page-size` with
+`project list`, `wp list`, `membership list`, `user list`, and
+`notification list`. Each call reads one page; JSON output retains the
+server collection metadata. MCP list tools accept `offset` and `pageSize`
+and distinguish the number returned from the collection total.

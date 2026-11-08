@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	membershipListOffset    int
 	membershipListProjectID int
 	membershipListPageSize  int
 
@@ -64,7 +65,12 @@ var membershipListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List memberships",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validatePagination(membershipListOffset, membershipListPageSize); err != nil {
+			return err
+		}
 		result, err := getClient().ListMemberships(getContext(), openproject.MembershipListInput{
+			Offset:    membershipListOffset,
+			PageSize:  membershipListPageSize,
 			ProjectID: membershipListProjectID,
 		})
 		if err != nil {
@@ -171,6 +177,7 @@ func init() {
 	membershipCmd.AddCommand(membershipDeleteCmd)
 
 	// List flags
+	membershipListCmd.Flags().IntVar(&membershipListOffset, "offset", 1, "Page number (starts at 1)")
 	membershipListCmd.Flags().IntVarP(&membershipListProjectID, "project", "p", 0, "Filter by project ID")
 	membershipListCmd.Flags().IntVarP(&membershipListPageSize, "page-size", "s", 20, "Number of results per page")
 

@@ -23,7 +23,7 @@ type GetUserArgs struct {
 func (r *Registry) registerUserTools(server *mcp.Server) {
 	addTool(server, "list_users", "List all users in OpenProject",
 		newSchema(schemaProps{
-			"offset":   schemaInt("Pagination offset (default: 0)"),
+			"offset":   schemaInt("Page number (starts at 1)"),
 			"pageSize": schemaInt("Number of items per page (default: 20)"),
 			"sortBy":   schemaStr(`Sort criteria, e.g. "name:asc"`),
 		}),
@@ -63,7 +63,7 @@ func (r *Registry) listUsers(ctx context.Context, req *mcp.CallToolRequest) (*mc
 		return errorResult("Failed to list users: %v", err), nil
 	}
 
-	result := fmt.Sprintf("Found %d users:\n\n", list.Total)
+	result := fmt.Sprintf("Showing %d of %d users:\n\n", len(list.UnderscoreEmbedded.Elements), list.Total)
 	for _, u := range list.UnderscoreEmbedded.Elements {
 		result += fmt.Sprintf("- **%s** (ID: %d) — %s", u.Name, u.Id, derefStr(u.Email))
 		if derefBool(u.Admin) {

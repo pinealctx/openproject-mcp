@@ -71,7 +71,7 @@ func (r *Registry) registerWorkPackageTools(server *mcp.Server) {
 	addTool(server, "list_work_packages", "List work packages, optionally filtered by project",
 		newSchema(schemaProps{
 			"projectId": schemaInt("Filter by project ID"),
-			"offset":    schemaInt("Pagination offset (default: 0)"),
+			"offset":    schemaInt("Page number (starts at 1)"),
 			"pageSize":  schemaInt("Number of items per page (default: 20)"),
 			"sortBy":    schemaStr(`Sort criteria, e.g. "updatedAt:desc"`),
 			"filters":   schemaStr("Raw JSON filter string"),
@@ -160,7 +160,7 @@ func (r *Registry) listWorkPackages(ctx context.Context, req *mcp.CallToolReques
 		return errorResult("Failed to list work packages: %v", err), nil
 	}
 
-	result := fmt.Sprintf("Found %d work packages:\n\n", list.Total)
+	result := fmt.Sprintf("Showing %d of %d work packages:\n\n", len(list.UnderscoreEmbedded.Elements), list.Total)
 	for _, wp := range list.UnderscoreEmbedded.Elements {
 		status, assignee, accountable := "", "", ""
 		if wp.UnderscoreLinks.Status.Title != nil {

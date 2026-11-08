@@ -35,7 +35,7 @@ func (r *Registry) registerMembershipTools(server *mcp.Server) {
 	addTool(server, "list_memberships", "List all memberships, optionally filtered by project",
 		newSchema(schemaProps{
 			"projectId": schemaInt("Filter by project ID"),
-			"offset":    schemaInt("Pagination offset"),
+			"offset":    schemaInt("Page number (starts at 1)"),
 			"pageSize":  schemaInt("Items per page"),
 		}),
 		r.listMemberships)
@@ -82,13 +82,15 @@ func (r *Registry) listMemberships(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	list, err := r.client.ListMemberships(ctx, openproject.MembershipListInput{
+		Offset:    args.Offset,
+		PageSize:  args.PageSize,
 		ProjectID: args.ProjectID,
 	})
 	if err != nil {
 		return errorResult("Failed to list memberships: %v", err), nil
 	}
 
-	result := fmt.Sprintf("Found %d memberships:\n\n", list.Total)
+	result := fmt.Sprintf("Showing %d of %d memberships:\n\n", len(list.UnderscoreEmbedded.Elements), list.Total)
 	for _, m := range list.UnderscoreEmbedded.Elements {
 		principal := "Unknown"
 		if m.UnderscoreLinks.Principal.Title != nil {

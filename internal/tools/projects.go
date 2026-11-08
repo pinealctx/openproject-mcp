@@ -9,8 +9,10 @@ import (
 )
 
 type ListProjectsArgs struct {
-	SortBy  string `json:"sortBy,omitempty"`
-	Filters string `json:"filters,omitempty"`
+	Offset   int    `json:"offset,omitempty"`
+	PageSize int    `json:"pageSize,omitempty"`
+	SortBy   string `json:"sortBy,omitempty"`
+	Filters  string `json:"filters,omitempty"`
 }
 
 type GetProjectArgs struct {
@@ -39,8 +41,10 @@ type DeleteProjectArgs struct {
 func (r *Registry) registerProjectTools(server *mcp.Server) {
 	addTool(server, "list_projects", "List all projects in OpenProject",
 		newSchema(schemaProps{
-			"sortBy":  schemaStr(`Sort criteria, e.g. "name:asc"`),
-			"filters": schemaStr(`Raw JSON filter string, e.g. [{"active":{"operator":"=","values":["t"]}}]`),
+			"offset":   schemaInt("Page number (starts at 1)"),
+			"pageSize": schemaInt("Items per page"),
+			"sortBy":   schemaStr(`Sort criteria, e.g. "name:asc"`),
+			"filters":  schemaStr(`Raw JSON filter string, e.g. [{"active":{"operator":"=","values":["t"]}}]`),
 		}),
 		r.listProjects)
 
@@ -79,14 +83,16 @@ func (r *Registry) listProjects(ctx context.Context, req *mcp.CallToolRequest) (
 	}
 
 	projects, err := r.client.ListProjects(ctx, openproject.ProjectListInput{
-		SortBy:  normalizeSortBy(args.SortBy),
-		Filters: args.Filters,
+		Offset:   args.Offset,
+		PageSize: args.PageSize,
+		SortBy:   normalizeSortBy(args.SortBy),
+		Filters:  args.Filters,
 	})
 	if err != nil {
 		return errorResult("Failed to list projects: %v", err), nil
 	}
 
-	result := fmt.Sprintf("Found %d projects:\n\n", projects.Total)
+	result := fmt.Sprintf("Showing %d of %d projects:\n\n", len(projects.UnderscoreEmbedded.Elements), projects.Total)
 	for _, p := range projects.UnderscoreEmbedded.Elements {
 		result += fmt.Sprintf("- **%s** (ID: %d)\n", derefStr(p.Name), derefInt(p.Id))
 		result += fmt.Sprintf("  Identifier: %s\n", derefStr(p.Identifier))

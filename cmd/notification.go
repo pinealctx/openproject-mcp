@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	external "github.com/pinealctx/openproject"
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	"github.com/spf13/cobra"
 )
 
 var (
+	notificationListOffset   int
 	notificationListPageSize int
 	notificationListUnread   bool
 )
@@ -53,8 +54,12 @@ var notificationListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List notifications",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validatePagination(notificationListOffset, notificationListPageSize); err != nil {
+			return err
+		}
 		api := getClient().APIClient()
 		params := &external.ListNotificationsParams{}
+		params.Offset = ptr(notificationListOffset)
 		if notificationListPageSize > 0 {
 			params.PageSize = ptr(notificationListPageSize)
 		}
@@ -119,6 +124,7 @@ func init() {
 	notificationCmd.AddCommand(notificationReadAllCmd)
 
 	// List flags
+	notificationListCmd.Flags().IntVar(&notificationListOffset, "offset", 1, "Page number (starts at 1)")
 	notificationListCmd.Flags().IntVarP(&notificationListPageSize, "page-size", "s", 20, "Number of results per page")
 	notificationListCmd.Flags().BoolVarP(&notificationListUnread, "unread", "u", false, "Show only unread notifications")
 }

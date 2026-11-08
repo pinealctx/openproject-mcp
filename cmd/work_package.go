@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	wpListOffset    int
 	wpListProjectID int
 	wpListPageSize  int
 	wpListSortBy    string
@@ -145,7 +146,11 @@ Examples:
   # Output as JSON
   openproject-mcp wp list -o json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validatePagination(wpListOffset, wpListPageSize); err != nil {
+			return err
+		}
 		result, err := getClient().ListWorkPackages(getContext(), openproject.WorkPackageListInput{
+			Offset:    wpListOffset,
 			ProjectID: wpListProjectID,
 			PageSize:  wpListPageSize,
 			SortBy:    normalizeSortBy(wpListSortBy),
@@ -465,6 +470,7 @@ func init() {
 	wpRelationCmd.AddCommand(wpRelationDeleteCmd)
 
 	// List flags
+	wpListCmd.Flags().IntVar(&wpListOffset, "offset", 1, "Page number (starts at 1)")
 	wpListCmd.Flags().IntVarP(&wpListProjectID, "project", "p", 0, "Filter by project ID")
 	wpListCmd.Flags().IntVarP(&wpListPageSize, "page-size", "s", 20, "Number of results per page")
 	wpListCmd.Flags().StringVar(&wpListSortBy, "sort-by", "updatedAt:desc", "Sort criteria")

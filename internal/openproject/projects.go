@@ -7,8 +7,10 @@ import (
 )
 
 type ProjectListInput struct {
-	SortBy  string
-	Filters string
+	Offset   int
+	PageSize int
+	SortBy   string
+	Filters  string
 }
 
 type ProjectCreateInput struct {
@@ -36,7 +38,7 @@ func (c *Client) ListProjects(ctx context.Context, input ProjectListInput) (*ext
 	}
 
 	var projects external.ProjectCollectionModel
-	resp, err := c.apiClient.ListProjects(ctx, params)
+	resp, err := c.apiClient.ListProjects(ctx, params, paginationEditor(input.Offset, input.PageSize))
 	if resp != nil {
 		defer func() { _ = resp.Body.Close() }()
 	}
