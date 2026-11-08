@@ -8,6 +8,8 @@ import (
 )
 
 type MembershipListInput struct {
+	Offset    int
+	PageSize  int
 	ProjectID int
 	Filters   string
 	SortBy    string
@@ -37,7 +39,7 @@ func (c *Client) ListMemberships(ctx context.Context, input MembershipListInput)
 	}
 
 	var memberships external.MembershipCollectionModel
-	resp, err := c.apiClient.ListMemberships(ctx, params)
+	resp, err := c.apiClient.ListMemberships(ctx, params, paginationEditor(input.Offset, input.PageSize))
 	if resp != nil {
 		defer func() { _ = resp.Body.Close() }()
 	}

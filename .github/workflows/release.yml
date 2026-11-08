@@ -24,6 +24,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Test and vet
+        run: |
+          go test -race ./...
+          go vet ./...
+
       - name: Get version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"

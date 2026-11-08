@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	projectListOffset   int
 	projectListPageSize int
 	projectListSortBy   string
 	projectListFilters  string
@@ -85,9 +86,14 @@ Examples:
   # Output as JSON
   openproject-mcp project list -o json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validatePagination(projectListOffset, projectListPageSize); err != nil {
+			return err
+		}
 		result, err := getClient().ListProjects(getContext(), openproject.ProjectListInput{
-			SortBy:  normalizeSortBy(projectListSortBy),
-			Filters: projectListFilters,
+			Offset:   projectListOffset,
+			PageSize: projectListPageSize,
+			SortBy:   normalizeSortBy(projectListSortBy),
+			Filters:  projectListFilters,
 		})
 		if err != nil {
 			return err
@@ -188,6 +194,7 @@ func init() {
 	projectCmd.AddCommand(projectDeleteCmd)
 
 	// List flags
+	projectListCmd.Flags().IntVar(&projectListOffset, "offset", 1, "Page number (starts at 1)")
 	projectListCmd.Flags().IntVarP(&projectListPageSize, "page-size", "s", 20, "Number of results per page")
 	projectListCmd.Flags().StringVar(&projectListSortBy, "sort-by", "name:asc", "Sort criteria")
 	projectListCmd.Flags().StringVar(&projectListFilters, "filters", "", "Raw JSON filter string")

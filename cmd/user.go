@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	external "github.com/pinealctx/openproject"
+	"github.com/pinealctx/openproject-mcp/internal/openproject"
 	"github.com/spf13/cobra"
 )
 
 var (
+	userListOffset   int
 	userListPageSize int
 	userListSortBy   string
 )
@@ -50,8 +51,12 @@ var userListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all users",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validatePagination(userListOffset, userListPageSize); err != nil {
+			return err
+		}
 		api := getClient().APIClient()
 		params := &external.ListUsersParams{}
+		params.Offset = ptr(userListOffset)
 		if userListPageSize > 0 {
 			params.PageSize = ptr(userListPageSize)
 		}
@@ -113,6 +118,7 @@ func init() {
 	userCmd.AddCommand(userMeCmd)
 
 	// List flags
+	userListCmd.Flags().IntVar(&userListOffset, "offset", 1, "Page number (starts at 1)")
 	userListCmd.Flags().IntVarP(&userListPageSize, "page-size", "s", 20, "Number of results per page")
 	userListCmd.Flags().StringVar(&userListSortBy, "sort-by", "name:asc", "Sort criteria")
 }
